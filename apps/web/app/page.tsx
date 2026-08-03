@@ -8,6 +8,7 @@ import {
   CategoryTop,
   getCategories,
   getCategoryTop,
+  TopProduct,
   triggerSync,
 } from "@/lib/api";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
@@ -41,6 +42,35 @@ function formatWhen(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+function productHref(product: TopProduct) {
+  return product.product_url || `https://www.amazon.co.uk/dp/${product.asin}`;
+}
+
+function ProductIdentity({ product }: { product: TopProduct }) {
+  return (
+    <div className="product">
+      {product.image_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="thumb"
+          src={product.image_url}
+          alt=""
+          width={56}
+          height={56}
+        />
+      ) : (
+        <div className="thumb" />
+      )}
+      <div className="product-copy">
+        <a href={productHref(product)} target="_blank" rel="noreferrer">
+          {product.title || product.asin}
+        </a>
+        <span className="asin">{product.asin}</span>
+      </div>
+    </div>
+  );
 }
 
 export default function HomePage() {
@@ -300,85 +330,109 @@ export default function HomePage() {
         {error ? <p className="error">{error}</p> : null}
       </section>
 
-      <section className="table-wrap">
+      <section className="products-section">
         {!data || data.products.length === 0 ? (
           <div className="empty">
             {pending ? "Loading…" : "No products in the database yet."}
           </div>
         ) : (
-          <table className="product-table">
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Product</th>
-                <th>Price</th>
-                <th>7-day Δ</th>
-                <th>Est. weekly units</th>
-                <th>Best Sellers Rank</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <ul className="product-cards">
               {data.products.map((product) => {
                 const delta = formatDelta(
                   product.price_change_absolute,
                   product.price_change_percent,
                 );
                 return (
-                  <tr key={product.asin}>
-                    <td data-label="Rank">#{product.rank}</td>
-                    <td data-label="Product">
-                      <div className="product">
-                        {product.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            className="thumb"
-                            src={product.image_url}
-                            alt=""
-                            width={56}
-                            height={56}
-                          />
-                        ) : (
-                          <div className="thumb" />
-                        )}
-                        <div>
-                          <a
-                            href={
-                              product.product_url ||
-                              `https://www.amazon.co.uk/dp/${product.asin}`
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {product.title || product.asin}
-                          </a>
-                          <span className="asin">{product.asin}</span>
-                        </div>
+                  <li key={product.asin} className="product-card">
+                    <div className="product-card-top">
+                      <span className="product-rank">#{product.rank}</span>
+                      <ProductIdentity product={product} />
+                    </div>
+                    <dl className="product-metrics">
+                      <div>
+                        <dt>Price</dt>
+                        <dd>{formatPrice(product.price, product.currency)}</dd>
                       </div>
-                    </td>
-                    <td data-label="Price">
-                      {formatPrice(product.price, product.currency)}
-                    </td>
-                    <td data-label="7-day Δ" className={delta.className}>
-                      {delta.text}
-                    </td>
-                    <td data-label="Est. weekly units">
-                      {product.estimated_weekly_units != null
-                        ? `~${product.estimated_weekly_units}`
-                        : "—"}
-                      {product.sales_estimate_source ? (
-                        <span className="asin">{product.sales_estimate_source}</span>
-                      ) : null}
-                    </td>
-                    <td data-label="Best Sellers Rank">
-                      {product.bsr != null
-                        ? product.bsr.toLocaleString("en-GB")
-                        : "—"}
-                    </td>
-                  </tr>
+                      <div>
+                        <dt>7-day Δ</dt>
+                        <dd className={delta.className}>{delta.text}</dd>
+                      </div>
+                      <div>
+                        <dt>Est. weekly units</dt>
+                        <dd>
+                          {product.estimated_weekly_units != null
+                            ? `~${product.estimated_weekly_units}`
+                            : "—"}
+                          {product.sales_estimate_source ? (
+                            <span className="asin">
+                              {product.sales_estimate_source}
+                            </span>
+                          ) : null}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Best Sellers Rank</dt>
+                        <dd>
+                          {product.bsr != null
+                            ? product.bsr.toLocaleString("en-GB")
+                            : "—"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
                 );
               })}
-            </tbody>
-          </table>
+            </ul>
+
+            <div className="table-wrap">
+              <table className="product-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Product</th>
+                    <th>Price</th>
+                    <th>7-day Δ</th>
+                    <th>Est. weekly units</th>
+                    <th>Best Sellers Rank</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.products.map((product) => {
+                    const delta = formatDelta(
+                      product.price_change_absolute,
+                      product.price_change_percent,
+                    );
+                    return (
+                      <tr key={product.asin}>
+                        <td>#{product.rank}</td>
+                        <td>
+                          <ProductIdentity product={product} />
+                        </td>
+                        <td>{formatPrice(product.price, product.currency)}</td>
+                        <td className={delta.className}>{delta.text}</td>
+                        <td>
+                          {product.estimated_weekly_units != null
+                            ? `~${product.estimated_weekly_units}`
+                            : "—"}
+                          {product.sales_estimate_source ? (
+                            <span className="asin">
+                              {product.sales_estimate_source}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td>
+                          {product.bsr != null
+                            ? product.bsr.toLocaleString("en-GB")
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
