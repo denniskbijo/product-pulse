@@ -1,31 +1,36 @@
-from app.providers.enrichment.easyparser import EasyparserClient, parse_detail_payload
 from app.config import Settings
+from app.providers.enrichment.easyparser import EasyparserClient, parse_detail_payload
 
 
-def test_parse_detail_payload_extracts_core_fields():
+def test_parse_detail_payload_nested_result_detail():
     body = {
-        "credit_used_this_request": 1,
-        "credits_remaining": 99,
+        "request_info": {
+            "success": True,
+            "credit_used_this_request": 1,
+            "credits_remaining": 97,
+        },
         "result": {
-            "title": "Test Kettle",
-            "brand": "BrandX",
-            "price": "24.99",
-            "currency": "GBP",
-            "rating": 4.5,
-            "reviewCount": "1,234",
-            "boughtPastMonth": "2000",
-            "bestsellers_rank": [{"category": "Kitchen", "rank": 12}],
-            "image": "https://example.com/img.jpg",
-            "url": "https://www.amazon.co.uk/dp/B0TESTASIN",
+            "detail": {
+                "title": "Test Kettle",
+                "brand": "BrandX",
+                "buybox_winner": {"price": 24.99, "currency": "GBP"},
+                "rating": 4.5,
+                "reviews_total": 1234,
+                "bought_activity": {"period": "past month", "raw": "700+ bought", "value": 700},
+                "bestsellers_rank": [{"category": "Kitchen", "rank": 12}],
+                "main_image": {"link": "https://example.com/img.jpg"},
+                "url": "https://www.amazon.co.uk/dp/B0TESTASIN",
+            }
         },
     }
     product = parse_detail_payload("B0TESTASIN", body)
     assert product.title == "Test Kettle"
     assert product.price == 24.99
-    assert product.monthly_sold == 2000
+    assert product.monthly_sold == 700
     assert product.bsr == 12
     assert product.review_count == 1234
-    assert product.credits_remaining == 99
+    assert product.credits_remaining == 97
+    assert product.image_url == "https://example.com/img.jpg"
 
 
 def test_credit_budget_guard():
