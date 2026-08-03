@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "amazon_pulse",
+  "project_id": "8789ed27-2e12-4dd9-8101-d882496668f5"
+}
