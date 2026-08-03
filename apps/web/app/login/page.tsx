@@ -41,7 +41,9 @@ export default function LoginPage() {
     <main className="shell login-shell">
       <section className="login-card">
         <h1 className="brand">Amazon Pulse</h1>
-        <p className="lede">Sign in to view UK category product research.</p>
+        <p className="lede">
+          Sign in to explore UK Amazon category sellers and your watchlist.
+        </p>
         <form className="login-form" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="username">Username</label>

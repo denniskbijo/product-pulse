@@ -165,8 +165,8 @@ def get_category_top(
     note = None
     if not price_history_ready:
         note = (
-            "7-day price change appears after daily scrapes accumulate "
-            "(or after a second weekly sync)."
+            "7-day price change appears after a few days of price checks "
+            "(or after a second weekly update)."
         )
 
     return CategoryTopOut(
@@ -211,7 +211,7 @@ def add_product_to_featured(
         return FeaturedProductAddOut(
             status="failed",
             message=(
-                "EASYPARSER_API_KEY is empty. Save it in the project root .env and restart."
+                "Product lookup is not configured. Ask an admin to finish setup."
             ),
             asin=asin,
             week_start=week_start,

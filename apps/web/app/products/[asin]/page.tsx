@@ -8,6 +8,10 @@ import {
   type ProductDetail,
 } from "@/lib/api";
 import { clearSession, loadSession } from "@/lib/auth";
+import {
+  formatEstimateSource,
+  formatPriceHistorySource,
+} from "@/lib/labels";
 
 function formatPrice(price: number | null, currency: string | null) {
   if (price == null) return "—";
@@ -64,7 +68,7 @@ function PriceSparkline({
         className="sparkline"
         viewBox={`0 0 ${path.w} ${path.h}`}
         role="img"
-        aria-label="Price history sparkline"
+        aria-label="Price history chart"
       >
         <path d={path.d} fill="none" stroke="currentColor" strokeWidth="2.5" />
       </svg>
@@ -129,6 +133,7 @@ export default function ProductDetailPage() {
     detail?.price_change_absolute ?? null,
     detail?.price_change_percent ?? null,
   );
+  const estimateSource = formatEstimateSource(detail?.sales_estimate_source);
 
   const onSaveNotes = async () => {
     if (!detail) return;
@@ -190,7 +195,7 @@ export default function ProductDetailPage() {
                   </strong>
                 </div>
                 <div>
-                  <span className="metric-label">7-day Δ</span>
+                  <span className="metric-label">7-day change</span>
                   <strong className={delta.className}>{delta.text}</strong>
                 </div>
               </div>
@@ -212,7 +217,9 @@ export default function ProductDetailPage() {
 
           <section className="detail-panel notes-editor">
             <h2>Notes</h2>
-            <p className="note">Private notes for this ASIN — shared across categories.</p>
+            <p className="note">
+              Notes stay with this product across every category list.
+            </p>
             <textarea
               value={notesDraft}
               onChange={(e) => setNotesDraft(e.target.value)}
@@ -235,10 +242,10 @@ export default function ProductDetailPage() {
           </section>
 
           <section className="detail-panel">
-            <h2>Stored enrichment</h2>
+            <h2>Product details</h2>
             <p className="note">
-              From Easyparser weekly/featured sync — viewing this page does not
-              use credits.
+              Snapshot from the latest category or featured update for this
+              product.
             </p>
             <dl className="detail-grid">
               <div>
@@ -255,8 +262,8 @@ export default function ProductDetailPage() {
                   {detail.estimated_weekly_units != null
                     ? `~${detail.estimated_weekly_units}`
                     : "—"}
-                  {detail.sales_estimate_source ? (
-                    <span className="asin">{detail.sales_estimate_source}</span>
+                  {estimateSource ? (
+                    <span className="asin">{estimateSource}</span>
                   ) : null}
                 </dd>
               </div>
@@ -295,15 +302,15 @@ export default function ProductDetailPage() {
           </section>
 
           <section className="detail-panel">
-            <h2>7-day price monitoring</h2>
+            <h2>Price history</h2>
             <p className="note">
-              Daily Amazon mobile scrapes when available; weekly snapshots fill
-              gaps.
+              Recent daily price checks, with weekly updates filling any gaps.
             </p>
             <PriceSparkline points={detail.price_history} />
             {detail.price_history.length === 0 ? (
               <p className="note">
-                No price history yet. Run a sync or `make scrape-prices`.
+                No price history yet. It appears after products are updated and
+                daily checks run.
               </p>
             ) : (
               <div className="table-wrap detail-history">
@@ -320,7 +327,7 @@ export default function ProductDetailPage() {
                       <tr key={`${point.date}-${point.source}`}>
                         <td>{point.date}</td>
                         <td>{formatPrice(point.price, point.currency)}</td>
-                        <td>{point.source}</td>
+                        <td>{formatPriceHistorySource(point.source)}</td>
                       </tr>
                     ))}
                   </tbody>

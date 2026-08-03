@@ -136,6 +136,8 @@ export default function HomePage() {
   } | null>(null);
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TopProduct | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const admin = isAdmin(session);
   const hasProducts = (data?.products.length ?? 0) > 0;
@@ -228,7 +230,7 @@ export default function HomePage() {
         load("featured");
       } else if (result.status === "budget_exceeded" && !admin) {
         setFeaturedAddError(
-          "Monthly enrichment limit reached. Contact an admin.",
+          "Monthly product lookup limit reached. Contact an admin.",
         );
       } else {
         setFeaturedAddError(result.message);
@@ -266,20 +268,19 @@ export default function HomePage() {
     }
   };
 
-  const onDeleteProduct = async (product: TopProduct) => {
-    const label = product.title || product.asin;
-    const ok = window.confirm(
-      `Remove “${label}” from this category list? Price history is kept.`,
-    );
-    if (!ok) return;
-    setActionAsin(product.asin);
+  const onConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setActionAsin(deleteTarget.asin);
     setError(null);
     try {
-      await removeProductFromCategory(selected, product.asin);
+      await removeProductFromCategory(selected, deleteTarget.asin);
+      setDeleteTarget(null);
       load(selected);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove product");
     } finally {
+      setDeleting(false);
       setActionAsin(null);
     }
   };
@@ -298,9 +299,7 @@ export default function HomePage() {
         <div className="hero-top">
           <h1 className="brand">Amazon Pulse</h1>
           <div className="session-bar">
-            <span className="note">
-              {session.username} · {session.role}
-            </span>
+            <span className="note">{session.username}</span>
             <button className="button secondary compact" onClick={onLogout}>
               Log out
             </button>
@@ -308,7 +307,7 @@ export default function HomePage() {
         </div>
         <p className="lede">
           {isFeatured
-            ? "Custom watchlist — add one ASIN or Amazon UK URL at a time (1 Easyparser credit each)."
+            ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it."
             : "UK category top sellers — current price, estimated weekly volume, and 7-day price changes."}
         </p>
         <div className="controls">
@@ -364,7 +363,7 @@ export default function HomePage() {
                 className={hasProducts ? "button secondary" : "button"}
                 onClick={() => onSync(1)}
                 disabled={syncing != null || pending}
-                title="Enrich the #1 product for this category"
+                title="Refresh details for the #1 product in this category"
               >
                 {syncing === "one" ? "Syncing…" : "Sync 1 product"}
               </button>
@@ -390,8 +389,8 @@ export default function HomePage() {
         <section className="empty-cta">
           <h2>No featured products yet</h2>
           <p className="note">
-            Featured is a custom list. Paste an ASIN or Amazon UK URL above to add
-            one product at a time.
+            Featured is your custom list. Paste an ASIN or Amazon UK URL above to
+            add one product at a time.
           </p>
         </section>
       ) : null}
@@ -400,8 +399,8 @@ export default function HomePage() {
         <section className="empty-cta">
           <h2>No products yet</h2>
           <p className="note">
-            Run a sync to pull category data into the database. Cached results will
-            show here for everyone after that.
+            Run a sync to load this category’s top sellers. Results will then be
+            available for everyone signed in.
           </p>
           <button
             className="button"
@@ -415,69 +414,41 @@ export default function HomePage() {
 
       <section className="status">
         <div>
-          {isFeatured ? "Last add / update" : "Last sync"}:{" "}
+          Last updated:{" "}
           <strong>{formatWhen(data?.sync.last_sync_at ?? null)}</strong>
-          {data?.sync.last_status && admin && !isFeatured
-            ? ` · ${data.sync.last_status}`
-            : ""}
         </div>
-        {admin && creditLabel ? (
-          <div>
-            Easyparser credits: <strong>{creditLabel}</strong>
-            {credits?.credits_remaining_reported != null
-              ? ` · provider reports ${credits.credits_remaining_reported} remaining`
-              : ""}
-          </div>
-        ) : null}
-        {admin && syncMessage ? <p className="note">{syncMessage}</p> : null}
-        {admin && data?.note ? <p className="note">{data.note}</p> : null}
-        {admin && data?.sync.last_error ? (
-          <p className="error">Last sync error: {data.sync.last_error}</p>
-        ) : null}
+        {data?.note ? <p className="note">{data.note}</p> : null}
         {error ? <p className="error">{error}</p> : null}
+        {admin ? (
+          <details className="system-details">
+            <summary>System details</summary>
+            <div className="system-details-body">
+              {!isFeatured && data?.sync.last_status ? (
+                <div>
+                  Last sync status: <strong>{data.sync.last_status}</strong>
+                </div>
+              ) : null}
+              {creditLabel ? (
+                <div>
+                  Enrichment credits: <strong>{creditLabel}</strong>
+                  {credits?.credits_remaining_reported != null
+                    ? ` · provider reports ${credits.credits_remaining_reported} remaining`
+                    : ""}
+                </div>
+              ) : null}
+              {syncMessage ? <p className="note">{syncMessage}</p> : null}
+              {data?.sync.last_error ? (
+                <p className="error">Last sync error: {data.sync.last_error}</p>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
       </section>
-
-      {notesEditor ? (
-        <section className="notes-editor" aria-label="Edit product notes">
-          <div className="notes-editor-head">
-            <h2>Notes</h2>
-            <p className="note">{notesEditor.title}</p>
-          </div>
-          <textarea
-            value={notesEditor.notes}
-            onChange={(e) =>
-              setNotesEditor({ ...notesEditor, notes: e.target.value })
-            }
-            rows={4}
-            placeholder="Add a note about this product…"
-            disabled={notesSaving}
-          />
-          {notesError ? <p className="error">{notesError}</p> : null}
-          <div className="notes-editor-actions">
-            <button
-              type="button"
-              className="button secondary compact"
-              disabled={notesSaving}
-              onClick={() => setNotesEditor(null)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="button compact"
-              disabled={notesSaving}
-              onClick={onSaveNotes}
-            >
-              {notesSaving ? "Saving…" : "Save notes"}
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       <section className="products-section">
         {!data || data.products.length === 0 ? (
           <div className="empty">
-            {pending ? "Loading…" : "No products in the database yet."}
+            {pending ? "Loading…" : "No products in this list yet."}
           </div>
         ) : (
           <>
@@ -500,7 +471,7 @@ export default function HomePage() {
                         <dd>{formatPrice(product.price, product.currency)}</dd>
                       </div>
                       <div>
-                        <dt>7-day Δ</dt>
+                        <dt>7-day change</dt>
                         <dd className={delta.className}>{delta.text}</dd>
                       </div>
                       <div>
@@ -509,11 +480,6 @@ export default function HomePage() {
                           {product.estimated_weekly_units != null
                             ? `~${product.estimated_weekly_units}`
                             : "—"}
-                          {product.sales_estimate_source ? (
-                            <span className="asin">
-                              {product.sales_estimate_source}
-                            </span>
-                          ) : null}
                         </dd>
                       </div>
                       <div>
@@ -529,7 +495,7 @@ export default function HomePage() {
                       product={product}
                       busy={busy}
                       onEditNotes={onEditNotes}
-                      onDelete={onDeleteProduct}
+                      onDelete={setDeleteTarget}
                     />
                   </li>
                 );
@@ -543,7 +509,7 @@ export default function HomePage() {
                     <th>Rank</th>
                     <th>Product</th>
                     <th>Price</th>
-                    <th>7-day Δ</th>
+                    <th>7-day change</th>
                     <th>Est. weekly units</th>
                     <th>Best Sellers Rank</th>
                     <th>Actions</th>
@@ -568,11 +534,6 @@ export default function HomePage() {
                           {product.estimated_weekly_units != null
                             ? `~${product.estimated_weekly_units}`
                             : "—"}
-                          {product.sales_estimate_source ? (
-                            <span className="asin">
-                              {product.sales_estimate_source}
-                            </span>
-                          ) : null}
                         </td>
                         <td>
                           {product.bsr != null
@@ -584,7 +545,7 @@ export default function HomePage() {
                             product={product}
                             busy={busy}
                             onEditNotes={onEditNotes}
-                            onDelete={onDeleteProduct}
+                            onDelete={setDeleteTarget}
                           />
                         </td>
                       </tr>
@@ -598,12 +559,105 @@ export default function HomePage() {
       </section>
 
       <p className="footer">
-        Sales units are estimates (Amazon “bought in past month” when available,
-        otherwise a UK Best Sellers Rank curve). Rich fields come from weekly
-        Easyparser sync; daily prices come from Amazon mobile pages
-        (`make scrape-prices`, max 10). 7-day Δ prefers daily history when
-        available.
+        Weekly unit figures are estimates — from Amazon’s “bought in past month”
+        when available, otherwise inferred from Best Sellers Rank. Prices update
+        from regular checks; 7-day change uses recent daily history when we have
+        it.
       </p>
+
+      {notesEditor ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!notesSaving) setNotesEditor(null);
+          }}
+        >
+          <div
+            className="modal-panel notes-editor"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit product notes"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="notes-editor-head">
+              <h2>Notes</h2>
+              <p className="note">{notesEditor.title}</p>
+            </div>
+            <textarea
+              value={notesEditor.notes}
+              onChange={(e) =>
+                setNotesEditor({ ...notesEditor, notes: e.target.value })
+              }
+              rows={4}
+              placeholder="Add a note about this product…"
+              disabled={notesSaving}
+              autoFocus
+            />
+            {notesError ? <p className="error">{notesError}</p> : null}
+            <div className="notes-editor-actions">
+              <button
+                type="button"
+                className="button secondary compact"
+                disabled={notesSaving}
+                onClick={() => setNotesEditor(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button compact"
+                disabled={notesSaving}
+                onClick={onSaveNotes}
+              >
+                {notesSaving ? "Saving…" : "Save notes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!deleting) setDeleteTarget(null);
+          }}
+        >
+          <div
+            className="modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm delete"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2>Remove product?</h2>
+            <p className="note">
+              Remove “{deleteTarget.title || deleteTarget.asin}” from this list?
+              Price history is kept, and category syncs may add it back later.
+            </p>
+            <div className="notes-editor-actions">
+              <button
+                type="button"
+                className="button secondary compact"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button danger compact"
+                disabled={deleting}
+                onClick={() => void onConfirmDelete()}
+              >
+                {deleting ? "Removing…" : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

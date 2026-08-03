@@ -135,10 +135,10 @@ def trigger_sync(
     if sync_run.status == "success":
         message = (
             f"Synced {sync_run.products_synced} product(s); "
-            f"used {sync_run.credits_used} Easyparser credit(s)"
+            f"used {sync_run.credits_used} enrichment credit(s)"
         )
     elif sync_run.status == "budget_exceeded":
-        message = sync_run.error_message or "Monthly Easyparser credit budget exhausted"
+        message = sync_run.error_message or "Monthly enrichment credit budget exhausted"
     else:
         message = sync_run.error_message or "Sync failed"
 
