@@ -235,7 +235,7 @@ export default function ProductDetailPage() {
           <section className="detail-panel">
             <h2>Product details</h2>
             <p className="note">
-              Snapshot from the latest category or featured update for this
+              Snapshot from the latest category or watchlist update for this
               product.
             </p>
             <dl className="detail-grid">

@@ -17,8 +17,8 @@ def _session():
 def test_get_product_detail_returns_enrichment_and_history():
     db = _session()
     cat = Category(
-        slug="featured",
-        name="Featured",
+        slug="watchlist",
+        name="Watchlist",
         bestsellers_url="https://www.amazon.co.uk/",
     )
     db.add(cat)
@@ -80,7 +80,7 @@ def test_get_product_detail_returns_enrichment_and_history():
     assert detail.price_change_absolute == 2.0
     assert detail.price_history_ready is True
     assert len(detail.price_history) >= 2
-    assert detail.categories[0].slug == "featured"
+    assert detail.categories[0].slug == "watchlist"
 
 
 def test_get_product_detail_missing():

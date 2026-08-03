@@ -9,14 +9,14 @@ from app.models import Category
 from app.schemas import (
     CategoryOut,
     CategoryTopOut,
-    FeaturedProductAddIn,
-    FeaturedProductAddOut,
     ProductRemoveOut,
     SyncStatus,
     SyncTriggerOut,
+    WatchlistProductAddIn,
+    WatchlistProductAddOut,
 )
 from app.services import (
-    add_product_to_featured,
+    add_product_to_watchlist,
     get_category_top,
     remove_product_from_category,
     resolve_category,
@@ -31,7 +31,10 @@ def list_categories(
     db: Session = Depends(get_db),
     _: AuthUser = Depends(get_current_user),
 ) -> list[Category]:
-    return list(db.scalars(select(Category).order_by(Category.name.asc())).all())
+    cats = list(db.scalars(select(Category).order_by(Category.name.asc())).all())
+    # Keep Watchlist at the top of the picker.
+    cats.sort(key=lambda c: (0 if c.slug == "watchlist" else 1, c.name.lower()))
+    return cats
 
 
 @router.get("/status", response_model=SyncStatus)
@@ -49,15 +52,15 @@ def global_sync_status(
     return status
 
 
-@router.post("/featured/products", response_model=FeaturedProductAddOut)
-def add_featured_product(
-    body: FeaturedProductAddIn,
+@router.post("/watchlist/products", response_model=WatchlistProductAddOut)
+def add_watchlist_product(
+    body: WatchlistProductAddIn,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     _: AuthUser = Depends(get_current_user),
-) -> FeaturedProductAddOut:
+) -> WatchlistProductAddOut:
     try:
-        return add_product_to_featured(db, raw_input=body.input, settings=settings)
+        return add_product_to_watchlist(db, raw_input=body.input, settings=settings)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:
@@ -110,7 +113,7 @@ def trigger_sync(
         default=None,
         ge=1,
         le=50,
-        description="How many bestsellers to enrich. Use 1 to spend a single Easyparser DETAIL credit.",
+        description="How many bestsellers to enrich. Use 1 to spend a single DETAIL credit.",
     ),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -119,12 +122,12 @@ def trigger_sync(
     category = resolve_category(db, category_id)
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
-    if category.slug == "featured":
+    if category.slug == "watchlist":
         raise HTTPException(
             status_code=400,
             detail=(
-                "Featured is a custom list — add products one at a time via "
-                "POST /categories/featured/products (no category sync)."
+                "Watchlist is a custom list — add products one at a time via "
+                "POST /categories/watchlist/products (no category sync)."
             ),
         )
 

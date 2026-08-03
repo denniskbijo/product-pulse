@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  addFeaturedProduct,
+  addWatchlistProduct,
   Category,
   CategoryTop,
   getCategories,
@@ -106,18 +106,18 @@ export default function HomePage() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selected, setSelected] = useState<string>("home-kitchen");
+  const [selected, setSelected] = useState<string>("watchlist");
   const [data, setData] = useState<CategoryTop | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [syncing, setSyncing] = useState<"full" | "one" | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [featuredInput, setFeaturedInput] = useState("");
-  const [addingFeatured, setAddingFeatured] = useState(false);
-  const [featuredAddMessage, setFeaturedAddMessage] = useState<string | null>(
+  const [watchlistInput, setWatchlistInput] = useState("");
+  const [addingWatchlist, setAddingWatchlist] = useState(false);
+  const [watchlistAddMessage, setWatchlistAddMessage] = useState<string | null>(
     null,
   );
-  const [featuredAddError, setFeaturedAddError] = useState<string | null>(null);
+  const [watchlistAddError, setWatchlistAddError] = useState<string | null>(null);
   const [actionAsin, setActionAsin] = useState<string | null>(null);
   const [notesEditor, setNotesEditor] = useState<{
     asin: string;
@@ -131,7 +131,7 @@ export default function HomePage() {
 
   const admin = isAdmin(session);
   const hasProducts = (data?.products.length ?? 0) > 0;
-  const isFeatured = selected === "featured";
+  const isWatchlist = selected === "watchlist";
 
   const load = (slug: string) => {
     startTransition(async () => {
@@ -161,7 +161,9 @@ export default function HomePage() {
       .then((cats) => {
         setCategories(cats);
         const initial =
-          cats.find((c) => c.slug === "home-kitchen")?.slug || cats[0]?.slug;
+          cats.find((c) => c.slug === "watchlist")?.slug ||
+          cats.find((c) => c.slug === "home-kitchen")?.slug ||
+          cats[0]?.slug;
         if (initial) {
           setSelected(initial);
           load(initial);
@@ -203,34 +205,34 @@ export default function HomePage() {
     router.replace("/login");
   };
 
-  const onAddFeatured = async () => {
-    const input = featuredInput.trim();
+  const onAddWatchlist = async () => {
+    const input = watchlistInput.trim();
     if (!input) return;
-    setAddingFeatured(true);
-    setFeaturedAddMessage(null);
-    setFeaturedAddError(null);
+    setAddingWatchlist(true);
+    setWatchlistAddMessage(null);
+    setWatchlistAddError(null);
     try {
-      const result = await addFeaturedProduct(input);
+      const result = await addWatchlistProduct(input);
       if (result.status === "success") {
-        setFeaturedAddMessage(result.message);
-        setFeaturedInput("");
-        if (selected !== "featured") {
-          setSelected("featured");
+        setWatchlistAddMessage(result.message);
+        setWatchlistInput("");
+        if (selected !== "watchlist") {
+          setSelected("watchlist");
         }
-        load("featured");
+        load("watchlist");
       } else if (result.status === "budget_exceeded" && !admin) {
-        setFeaturedAddError(
+        setWatchlistAddError(
           "Monthly product lookup limit reached. Contact an admin.",
         );
       } else {
-        setFeaturedAddError(result.message);
+        setWatchlistAddError(result.message);
       }
     } catch (err) {
-      setFeaturedAddError(
+      setWatchlistAddError(
         err instanceof Error ? err.message : "Failed to add product",
       );
     } finally {
-      setAddingFeatured(false);
+      setAddingWatchlist(false);
     }
   };
 
@@ -296,7 +298,7 @@ export default function HomePage() {
           </div>
         </div>
         <p className="lede">
-          {isFeatured
+          {isWatchlist
             ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it."
             : "UK category top sellers — current price, estimated weekly volume, and 7-day price changes."}
         </p>
@@ -319,35 +321,35 @@ export default function HomePage() {
               ))}
             </select>
           </div>
-          {isFeatured ? (
+          {isWatchlist ? (
             <>
-              <div className="field field-featured">
-                <label htmlFor="featured-input">ASIN or Amazon UK URL</label>
+              <div className="field field-watchlist">
+                <label htmlFor="watchlist-input">ASIN or Amazon UK URL</label>
                 <input
-                  id="featured-input"
+                  id="watchlist-input"
                   type="text"
                   placeholder="B0… or amazon.co.uk/dp/…"
-                  value={featuredInput}
-                  onChange={(event) => setFeaturedInput(event.target.value)}
+                  value={watchlistInput}
+                  onChange={(event) => setWatchlistInput(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
-                      void onAddFeatured();
+                      void onAddWatchlist();
                     }
                   }}
-                  disabled={addingFeatured || pending}
+                  disabled={addingWatchlist || pending}
                 />
               </div>
               <button
                 className="button"
-                onClick={() => void onAddFeatured()}
-                disabled={addingFeatured || pending || !featuredInput.trim()}
+                onClick={() => void onAddWatchlist()}
+                disabled={addingWatchlist || pending || !watchlistInput.trim()}
               >
-                {addingFeatured ? "Adding…" : "Add product"}
+                {addingWatchlist ? "Adding…" : "Add product"}
               </button>
             </>
           ) : null}
-          {admin && !isFeatured ? (
+          {admin && !isWatchlist ? (
             <>
               <button
                 className={hasProducts ? "button secondary" : "button"}
@@ -367,25 +369,25 @@ export default function HomePage() {
             </>
           ) : null}
         </div>
-        {featuredAddMessage ? (
-          <p className="note">{featuredAddMessage}</p>
+        {watchlistAddMessage ? (
+          <p className="note">{watchlistAddMessage}</p>
         ) : null}
-        {featuredAddError ? (
-          <p className="error">{featuredAddError}</p>
+        {watchlistAddError ? (
+          <p className="error">{watchlistAddError}</p>
         ) : null}
       </section>
 
-      {!hasProducts && isFeatured ? (
+      {!hasProducts && isWatchlist ? (
         <section className="empty-cta">
-          <h2>No featured products yet</h2>
+          <h2>No watchlist products yet</h2>
           <p className="note">
-            Featured is your custom list. Paste an ASIN or Amazon UK URL above to
+            Watchlist is your custom list. Paste an ASIN or Amazon UK URL above to
             add one product at a time.
           </p>
         </section>
       ) : null}
 
-      {!hasProducts && admin && !isFeatured ? (
+      {!hasProducts && admin && !isWatchlist ? (
         <section className="empty-cta">
           <h2>No products yet</h2>
           <p className="note">
@@ -413,7 +415,7 @@ export default function HomePage() {
           <details className="system-details">
             <summary>System details</summary>
             <div className="system-details-body">
-              {!isFeatured && data?.sync.last_status ? (
+              {!isWatchlist && data?.sync.last_status ? (
                 <div>
                   Last sync status: <strong>{data.sync.last_status}</strong>
                 </div>

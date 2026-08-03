@@ -5,8 +5,8 @@ from app.models import Category
 
 SEED_CATEGORIES = [
     {
-        "slug": "featured",
-        "name": "Featured",
+        "slug": "watchlist",
+        "name": "Watchlist",
         "bestsellers_url": "https://www.amazon.co.uk/",
     },
     {
@@ -28,6 +28,16 @@ SEED_CATEGORIES = [
 
 
 def seed_categories(db: Session) -> None:
+    # Migrate legacy Featured → Watchlist (keep category id / snapshots).
+    legacy = db.scalar(select(Category).where(Category.slug == "featured"))
+    if legacy is not None:
+        already = db.scalar(select(Category).where(Category.slug == "watchlist"))
+        if already is None:
+            legacy.slug = "watchlist"
+            legacy.name = "Watchlist"
+        else:
+            legacy.name = "Watchlist (legacy)"
+
     for item in SEED_CATEGORIES:
         existing = db.scalar(select(Category).where(Category.slug == item["slug"]))
         if existing:

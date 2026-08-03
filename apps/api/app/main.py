@@ -28,8 +28,8 @@ def _weekly_sync_job() -> None:
     db = SessionLocal()
     try:
         cats = db.scalars(select(Category).order_by(Category.id.asc())).all()
-        # Free-tier default: sync first real bestsellers category (skip Featured).
-        target = next((c for c in cats if c.slug != "featured"), None)
+        # Free-tier default: sync first real bestsellers category (skip Watchlist).
+        target = next((c for c in cats if c.slug != "watchlist"), None)
         if target is not None:
             run_category_sync(db, target, settings=settings)
     except Exception:  # noqa: BLE001

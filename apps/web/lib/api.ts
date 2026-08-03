@@ -142,7 +142,7 @@ export function triggerSync(idOrSlug: string | number, topN?: number) {
   });
 }
 
-export type FeaturedProductAddResult = {
+export type WatchlistProductAddResult = {
   status: "success" | "budget_exceeded" | "failed" | string;
   message: string;
   asin: string | null;
@@ -153,8 +153,8 @@ export type FeaturedProductAddResult = {
   week_start: string | null;
 };
 
-export function addFeaturedProduct(input: string) {
-  return apiFetch<FeaturedProductAddResult>("/categories/featured/products", {
+export function addWatchlistProduct(input: string) {
+  return apiFetch<WatchlistProductAddResult>("/categories/watchlist/products", {
     method: "POST",
     body: JSON.stringify({ input }),
   });

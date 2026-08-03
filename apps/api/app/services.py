@@ -14,7 +14,7 @@ from app.providers.enrichment.easyparser import CreditBudgetExceeded, Easyparser
 from app.schemas import (
     CategoryOut,
     CategoryTopOut,
-    FeaturedProductAddOut,
+    WatchlistProductAddOut,
     PriceHistoryPointOut,
     ProductCategorySightingOut,
     ProductDetailOut,
@@ -191,16 +191,16 @@ def current_week_start() -> date:
     return week_start_for(date.today())
 
 
-def add_product_to_featured(
+def add_product_to_watchlist(
     db: Session,
     *,
     raw_input: str,
     settings: Settings,
-) -> FeaturedProductAddOut:
+) -> WatchlistProductAddOut:
     asin = parse_asin_from_input(raw_input)
-    category = resolve_category(db, "featured")
+    category = resolve_category(db, "watchlist")
     if category is None:
-        raise LookupError("Featured category not found")
+        raise LookupError("Watchlist category not found")
 
     week_start = week_start_for(date.today())
     ledger = get_or_create_ledger(db)
@@ -208,7 +208,7 @@ def add_product_to_featured(
     credits = credit_status(db, settings)
 
     if not settings.easyparser_api_key.strip():
-        return FeaturedProductAddOut(
+        return WatchlistProductAddOut(
             status="failed",
             message=(
                 "Product lookup is not configured. Ask an admin to finish setup."
@@ -221,7 +221,7 @@ def add_product_to_featured(
     try:
         client.ensure_budget(1)
     except CreditBudgetExceeded as exc:
-        return FeaturedProductAddOut(
+        return WatchlistProductAddOut(
             status="budget_exceeded",
             message=str(exc),
             asin=asin,
@@ -233,7 +233,7 @@ def add_product_to_featured(
         enriched = client.get_detail(asin)
     except Exception as exc:  # noqa: BLE001
         credits = credit_status(db, settings)
-        return FeaturedProductAddOut(
+        return WatchlistProductAddOut(
             status="failed",
             message=str(exc),
             asin=asin,
@@ -299,9 +299,9 @@ def add_product_to_featured(
 
     credits = credit_status(db, settings)
     title = enriched.title or product.title
-    return FeaturedProductAddOut(
+    return WatchlistProductAddOut(
         status="success",
-        message=f"Added {title or asin} to Featured (rank {rank})",
+        message=f"Added {title or asin} to Watchlist (rank {rank})",
         asin=asin,
         title=title,
         rank=rank,

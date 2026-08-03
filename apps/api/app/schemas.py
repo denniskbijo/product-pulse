@@ -69,11 +69,11 @@ class SyncTriggerOut(BaseModel):
     credits_remaining_budget: int | None = None
 
 
-class FeaturedProductAddIn(BaseModel):
+class WatchlistProductAddIn(BaseModel):
     input: str = Field(min_length=1)
 
 
-class FeaturedProductAddOut(BaseModel):
+class WatchlistProductAddOut(BaseModel):
     status: str
     message: str
     asin: str | None = None

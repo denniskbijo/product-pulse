@@ -167,7 +167,7 @@ select {
   min-width: 220px;
 }
 
-.controls .field-featured input {
+.controls .field-watchlist input {
   min-width: min(360px, 100%);
 }
 
@@ -685,8 +685,8 @@ tr:last-child td {
 
   .field,
   .field select,
-  .controls .field-featured,
-  .controls .field-featured input,
+  .controls .field-watchlist,
+  .controls .field-watchlist input,
   .controls .button {
     width: 100%;
     min-width: 0;

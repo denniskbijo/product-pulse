@@ -20,8 +20,8 @@ def _session():
 
 def _seed(db):
     cat = Category(
-        slug="featured",
-        name="Featured",
+        slug="watchlist",
+        name="Watchlist",
         bestsellers_url="https://www.amazon.co.uk/",
     )
     other = Category(
@@ -78,9 +78,9 @@ def test_update_product_notes():
 
 def test_remove_product_from_category_keeps_other_categories():
     db = _session()
-    featured, home, asin = _seed(db)
+    watchlist, home, asin = _seed(db)
 
-    out = remove_product_from_category(db, featured, asin)
+    out = remove_product_from_category(db, watchlist, asin)
     assert out.snapshots_removed == 1
     assert out.status == "success"
 
@@ -94,9 +94,9 @@ def test_remove_product_from_category_keeps_other_categories():
 
 def test_remove_missing_product_raises():
     db = _session()
-    featured, _, _ = _seed(db)
+    watchlist, _, _ = _seed(db)
     try:
-        remove_product_from_category(db, featured, "B0MISSING1")
+        remove_product_from_category(db, watchlist, "B0MISSING1")
         raise AssertionError("expected LookupError")
     except LookupError:
         pass
