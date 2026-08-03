@@ -87,6 +87,14 @@ def trigger_sync(
     category = resolve_category(db, category_id)
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
+    if category.slug == "featured":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Featured is a custom list — add products one at a time via "
+                "POST /categories/featured/products (no category sync)."
+            ),
+        )
 
     count = top_n if top_n is not None else settings.sync_top_n
     sync_run = run_category_sync(db, category, settings=settings, top_n=count)

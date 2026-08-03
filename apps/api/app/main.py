@@ -28,9 +28,10 @@ def _weekly_sync_job() -> None:
     db = SessionLocal()
     try:
         cats = db.scalars(select(Category).order_by(Category.id.asc())).all()
-        # Free-tier default: sync only the first seeded category weekly.
-        if cats:
-            run_category_sync(db, cats[0], settings=settings)
+        # Free-tier default: sync first real bestsellers category (skip Featured).
+        target = next((c for c in cats if c.slug != "featured"), None)
+        if target is not None:
+            run_category_sync(db, target, settings=settings)
     except Exception:  # noqa: BLE001
         # Scheduler should not crash the API process.
         pass

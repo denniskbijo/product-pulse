@@ -93,6 +93,7 @@ export default function HomePage() {
 
   const admin = isAdmin(session);
   const hasProducts = (data?.products.length ?? 0) > 0;
+  const isFeatured = selected === "featured";
 
   const load = (slug: string) => {
     startTransition(async () => {
@@ -218,8 +219,9 @@ export default function HomePage() {
           </div>
         </div>
         <p className="lede">
-          UK category top sellers — current price, estimated weekly volume, and
-          7-day price changes.
+          {isFeatured
+            ? "Custom watchlist — add one ASIN or Amazon UK URL at a time (1 Easyparser credit each)."
+            : "UK category top sellers — current price, estimated weekly volume, and 7-day price changes."}
         </p>
         <div className="controls">
           <div className="field">
@@ -240,31 +242,35 @@ export default function HomePage() {
               ))}
             </select>
           </div>
-          <div className="field field-featured">
-            <label htmlFor="featured-input">Featured ASIN or URL</label>
-            <input
-              id="featured-input"
-              type="text"
-              placeholder="B0… or amazon.co.uk/dp/…"
-              value={featuredInput}
-              onChange={(event) => setFeaturedInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void onAddFeatured();
-                }
-              }}
-              disabled={addingFeatured || pending}
-            />
-          </div>
-          <button
-            className="button secondary"
-            onClick={() => void onAddFeatured()}
-            disabled={addingFeatured || pending || !featuredInput.trim()}
-          >
-            {addingFeatured ? "Adding…" : "Add product"}
-          </button>
-          {admin ? (
+          {isFeatured ? (
+            <>
+              <div className="field field-featured">
+                <label htmlFor="featured-input">ASIN or Amazon UK URL</label>
+                <input
+                  id="featured-input"
+                  type="text"
+                  placeholder="B0… or amazon.co.uk/dp/…"
+                  value={featuredInput}
+                  onChange={(event) => setFeaturedInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void onAddFeatured();
+                    }
+                  }}
+                  disabled={addingFeatured || pending}
+                />
+              </div>
+              <button
+                className="button"
+                onClick={() => void onAddFeatured()}
+                disabled={addingFeatured || pending || !featuredInput.trim()}
+              >
+                {addingFeatured ? "Adding…" : "Add product"}
+              </button>
+            </>
+          ) : null}
+          {admin && !isFeatured ? (
             <>
               <button
                 className={hasProducts ? "button secondary" : "button"}
@@ -292,7 +298,17 @@ export default function HomePage() {
         ) : null}
       </section>
 
-      {!hasProducts && admin ? (
+      {!hasProducts && isFeatured ? (
+        <section className="empty-cta">
+          <h2>No featured products yet</h2>
+          <p className="note">
+            Featured is a custom list. Paste an ASIN or Amazon UK URL above to add
+            one product at a time.
+          </p>
+        </section>
+      ) : null}
+
+      {!hasProducts && admin && !isFeatured ? (
         <section className="empty-cta">
           <h2>No products yet</h2>
           <p className="note">
@@ -311,8 +327,11 @@ export default function HomePage() {
 
       <section className="status">
         <div>
-          Last sync: <strong>{formatWhen(data?.sync.last_sync_at ?? null)}</strong>
-          {data?.sync.last_status && admin ? ` · ${data.sync.last_status}` : ""}
+          {isFeatured ? "Last add / update" : "Last sync"}:{" "}
+          <strong>{formatWhen(data?.sync.last_sync_at ?? null)}</strong>
+          {data?.sync.last_status && admin && !isFeatured
+            ? ` · ${data.sync.last_status}`
+            : ""}
         </div>
         {admin && creditLabel ? (
           <div>
