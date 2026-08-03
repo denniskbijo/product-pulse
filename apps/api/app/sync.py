@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -86,16 +86,19 @@ def run_category_sync(
 
         client.ensure_budget(len(entries))
 
-        # Replace this week's category snapshot set so ranks stay unique.
-        old_rows = db.scalars(
-            select(ProductSnapshot).where(
-                ProductSnapshot.category_id == category.id,
-                ProductSnapshot.week_start == week_start,
-            )
-        ).all()
-        for row in old_rows:
-            db.delete(row)
-        db.flush()
+        # Full top-N sync replaces this week's ranked set. Partial sync (e.g. Sync 1)
+        # only upserts discovered ASINs and keeps other products for the week.
+        replace_week_set = top_n >= settings.sync_top_n
+        if replace_week_set:
+            old_rows = db.scalars(
+                select(ProductSnapshot).where(
+                    ProductSnapshot.category_id == category.id,
+                    ProductSnapshot.week_start == week_start,
+                )
+            ).all()
+            for row in old_rows:
+                db.delete(row)
+            db.flush()
 
         for entry in entries:
             enriched = client.get_detail(entry.asin)
@@ -121,15 +124,26 @@ def run_category_sync(
                 )
             )
             if existing is None:
+                if replace_week_set:
+                    rank = entry.rank
+                else:
+                    max_rank = db.scalar(
+                        select(func.max(ProductSnapshot.rank)).where(
+                            ProductSnapshot.category_id == category.id,
+                            ProductSnapshot.week_start == week_start,
+                        )
+                    )
+                    rank = (max_rank or 0) + 1
                 existing = ProductSnapshot(
                     category_id=category.id,
                     asin=entry.asin,
                     week_start=week_start,
-                    rank=entry.rank,
+                    rank=rank,
                 )
                 db.add(existing)
+            elif replace_week_set:
+                existing.rank = entry.rank
 
-            existing.rank = entry.rank
             existing.price = enriched.price
             existing.currency = enriched.currency
             existing.bsr = enriched.bsr
