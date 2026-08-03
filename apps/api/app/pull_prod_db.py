@@ -57,9 +57,17 @@ def _sqlite_path(url: str) -> Path | None:
     raw = url.removeprefix("sqlite:///")
     path = Path(raw)
     if not path.is_absolute():
-        # Resolve relative to API root (same convention as local runs).
+        # Resolve relative to API root so make db-pull / make run share one file.
         path = (API_ROOT / path).resolve()
     return path
+
+
+def _canonicalize_target_url(url: str) -> str:
+    """Point relative sqlite:/// paths at apps/api regardless of process cwd."""
+    path = _sqlite_path(url)
+    if path is None:
+        return url
+    return f"sqlite:///{path}"
 
 
 def _looks_like_db_url(value: str) -> bool:
@@ -240,7 +248,7 @@ def copy_database(*, source_url: str, target_url: str) -> dict[str, int]:
 
 def run_pull() -> int:
     settings = get_settings()
-    target_url = _normalize_sqlalchemy_url(settings.database_url)
+    target_url = _canonicalize_target_url(_normalize_sqlalchemy_url(settings.database_url))
     source_url = resolve_prod_database_url()
 
     if source_url == target_url:

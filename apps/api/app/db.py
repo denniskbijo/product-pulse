@@ -1,20 +1,33 @@
 from collections.abc import Generator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.config import get_settings
+from app.config import API_ROOT, get_settings
 
 
 class Base(DeclarativeBase):
     pass
 
 
+def _resolve_database_url(url: str) -> str:
+    """Keep relative sqlite paths under apps/api even when cwd is the repo root."""
+    if not url.startswith("sqlite:///"):
+        return url
+    raw = url.removeprefix("sqlite:///")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = (API_ROOT / path).resolve()
+    return f"sqlite:///{path}"
+
+
 settings = get_settings()
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+database_url = _resolve_database_url(settings.database_url)
+connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
 engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=not settings.database_url.startswith("sqlite"),
+    database_url,
+    pool_pre_ping=not database_url.startswith("sqlite"),
     connect_args=connect_args,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
