@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+*.db
+amazon_pulse.db
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+node_modules/
+.next/
+dist/
+build/
+*.egg-info/
+.DS_Store
+pgdata/
