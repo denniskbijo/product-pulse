@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.db import SessionLocal, init_db
 from app.models import Category
-from app.routers import auth, categories
+from app.routers import auth, categories, products
 from app.seed import seed_categories
 from app.sync import run_category_sync
 
@@ -83,6 +83,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(categories.router)
+app.include_router(products.router)
 
 
 @app.get("/health")

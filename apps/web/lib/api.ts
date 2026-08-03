@@ -158,3 +158,42 @@ export function addFeaturedProduct(input: string) {
     body: JSON.stringify({ input }),
   });
 }
+
+export type PriceHistoryPoint = {
+  date: string;
+  price: number;
+  currency: string | null;
+  source: string;
+};
+
+export type ProductDetail = {
+  asin: string;
+  title: string | null;
+  image_url: string | null;
+  brand: string | null;
+  product_url: string | null;
+  price: number | null;
+  currency: string | null;
+  price_change_absolute: number | null;
+  price_change_percent: number | null;
+  price_history_ready: boolean;
+  estimated_weekly_units: number | null;
+  sales_estimate_source: string | null;
+  bsr: number | null;
+  rating: number | null;
+  review_count: number | null;
+  monthly_sold: number | null;
+  latest_week_start: string | null;
+  updated_at: string | null;
+  categories: Array<{
+    slug: string;
+    name: string;
+    rank: number;
+    week_start: string;
+  }>;
+  price_history: PriceHistoryPoint[];
+};
+
+export function getProductDetail(asin: string) {
+  return apiFetch<ProductDetail>(`/products/${encodeURIComponent(asin)}`);
+}

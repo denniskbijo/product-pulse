@@ -11,7 +11,15 @@ from app.credits import credit_status, get_or_create_ledger, record_credit_usage
 from app.math_estimates import estimate_weekly_units, price_change, week_start_for
 from app.models import Category, DailyPricePoint, Product, ProductSnapshot
 from app.providers.enrichment.easyparser import CreditBudgetExceeded, EasyparserClient
-from app.schemas import CategoryOut, CategoryTopOut, FeaturedProductAddOut, TopProductOut
+from app.schemas import (
+    CategoryOut,
+    CategoryTopOut,
+    FeaturedProductAddOut,
+    PriceHistoryPointOut,
+    ProductCategorySightingOut,
+    ProductDetailOut,
+    TopProductOut,
+)
 from app.sync import build_sync_status
 
 
@@ -297,4 +305,148 @@ def add_product_to_featured(
         credits_used=enriched.credit_used,
         credits_remaining_budget=credits["credits_remaining_budget"],
         week_start=week_start,
+    )
+
+
+def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
+    """Return stored Easyparser enrichment + recent price history (no provider calls)."""
+    asin = asin.strip().upper()
+    product = db.get(Product, asin)
+    if product is None:
+        return None
+
+    latest_snap = db.scalar(
+        select(ProductSnapshot)
+        .where(ProductSnapshot.asin == asin)
+        .order_by(ProductSnapshot.week_start.desc(), ProductSnapshot.id.desc())
+        .limit(1)
+    )
+
+    sightings = db.execute(
+        select(
+            Category.slug,
+            Category.name,
+            ProductSnapshot.rank,
+            ProductSnapshot.week_start,
+        )
+        .join(Category, Category.id == ProductSnapshot.category_id)
+        .where(ProductSnapshot.asin == asin)
+        .order_by(ProductSnapshot.week_start.desc(), ProductSnapshot.rank.asc())
+        .limit(20)
+    ).all()
+    # Keep one row per category (latest week).
+    seen_cats: set[str] = set()
+    categories: list[ProductCategorySightingOut] = []
+    for slug, name, rank, week_start in sightings:
+        if slug in seen_cats:
+            continue
+        seen_cats.add(slug)
+        categories.append(
+            ProductCategorySightingOut(
+                slug=slug, name=name, rank=rank, week_start=week_start
+            )
+        )
+
+    today = date.today()
+    history_start = today - timedelta(days=30)
+    daily_rows = db.scalars(
+        select(DailyPricePoint)
+        .where(
+            DailyPricePoint.asin == asin,
+            DailyPricePoint.observed_on >= history_start,
+            DailyPricePoint.status == "success",
+            DailyPricePoint.price.is_not(None),
+        )
+        .order_by(DailyPricePoint.observed_on.asc())
+    ).all()
+
+    by_day: dict[date, PriceHistoryPointOut] = {
+        row.observed_on: PriceHistoryPointOut(
+            date=row.observed_on,
+            price=float(row.price),  # type: ignore[arg-type]
+            currency=row.currency or "GBP",
+            source="amazon_mobile",
+        )
+        for row in daily_rows
+    }
+
+    # Fill gaps with weekly snapshot prices (dated as week_start).
+    weekly_rows = db.scalars(
+        select(ProductSnapshot)
+        .where(
+            ProductSnapshot.asin == asin,
+            ProductSnapshot.week_start >= history_start,
+            ProductSnapshot.price.is_not(None),
+        )
+        .order_by(ProductSnapshot.week_start.asc())
+    ).all()
+    for row in weekly_rows:
+        if row.week_start not in by_day and row.price is not None:
+            by_day[row.week_start] = PriceHistoryPointOut(
+                date=row.week_start,
+                price=float(row.price),
+                currency=row.currency or "GBP",
+                source="weekly_snapshot",
+            )
+
+    price_history = [by_day[d] for d in sorted(by_day)]
+
+    now_daily = _daily_prices_by_asin(db, [asin], on_or_before=today).get(asin)
+    prev_daily = _daily_prices_by_asin(
+        db, [asin], on_or_before=today - timedelta(days=7)
+    ).get(asin)
+
+    display_price = (
+        now_daily.price
+        if now_daily
+        else (latest_snap.price if latest_snap else None)
+    )
+    display_currency = (
+        (now_daily.currency if now_daily and now_daily.currency else None)
+        or (latest_snap.currency if latest_snap else None)
+        or "GBP"
+    )
+
+    if now_daily and prev_daily and now_daily.observed_on != prev_daily.observed_on:
+        delta = price_change(now_daily.price, prev_daily.price)
+        history_ready = True
+    elif latest_snap is not None:
+        prev_week = db.scalar(
+            select(ProductSnapshot)
+            .where(
+                ProductSnapshot.asin == asin,
+                ProductSnapshot.week_start == latest_snap.week_start - timedelta(days=7),
+                ProductSnapshot.price.is_not(None),
+            )
+            .limit(1)
+        )
+        delta = price_change(
+            latest_snap.price, prev_week.price if prev_week else None
+        )
+        history_ready = prev_week is not None
+    else:
+        delta = price_change(None, None)
+        history_ready = False
+
+    return ProductDetailOut(
+        asin=asin,
+        title=product.title,
+        image_url=product.image_url,
+        brand=product.brand,
+        product_url=product.product_url or f"https://www.amazon.co.uk/dp/{asin}",
+        price=display_price,
+        currency=display_currency,
+        price_change_absolute=delta.absolute,
+        price_change_percent=delta.percent,
+        price_history_ready=history_ready,
+        estimated_weekly_units=latest_snap.estimated_weekly_units if latest_snap else None,
+        sales_estimate_source=latest_snap.sales_estimate_source if latest_snap else None,
+        bsr=latest_snap.bsr if latest_snap else None,
+        rating=latest_snap.rating if latest_snap else None,
+        review_count=latest_snap.review_count if latest_snap else None,
+        monthly_sold=latest_snap.monthly_sold if latest_snap else None,
+        latest_week_start=latest_snap.week_start if latest_snap else None,
+        updated_at=product.updated_at,
+        categories=categories,
+        price_history=price_history,
     )

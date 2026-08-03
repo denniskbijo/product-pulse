@@ -44,10 +44,6 @@ function formatWhen(value: string | null) {
   });
 }
 
-function productHref(product: TopProduct) {
-  return product.product_url || `https://www.amazon.co.uk/dp/${product.asin}`;
-}
-
 function ProductIdentity({ product }: { product: TopProduct }) {
   return (
     <div className="product">
@@ -64,7 +60,11 @@ function ProductIdentity({ product }: { product: TopProduct }) {
         <div className="thumb" />
       )}
       <div className="product-copy">
-        <a href={productHref(product)} target="_blank" rel="noreferrer">
+        <a
+          href={`/products/${encodeURIComponent(product.asin)}`}
+          target="_blank"
+          rel="noreferrer"
+        >
           {product.title || product.asin}
         </a>
         <span className="asin">{product.asin}</span>

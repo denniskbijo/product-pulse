@@ -81,3 +81,40 @@ class FeaturedProductAddOut(BaseModel):
     credits_used: int = 0
     credits_remaining_budget: int | None = None
     week_start: date | None = None
+
+
+class PriceHistoryPointOut(BaseModel):
+    date: date
+    price: float
+    currency: str | None = "GBP"
+    source: str  # amazon_mobile | weekly_snapshot
+
+
+class ProductCategorySightingOut(BaseModel):
+    slug: str
+    name: str
+    rank: int
+    week_start: date
+
+
+class ProductDetailOut(BaseModel):
+    asin: str
+    title: str | None = None
+    image_url: str | None = None
+    brand: str | None = None
+    product_url: str | None = None
+    price: float | None = None
+    currency: str | None = "GBP"
+    price_change_absolute: float | None = None
+    price_change_percent: float | None = None
+    price_history_ready: bool = False
+    estimated_weekly_units: float | None = None
+    sales_estimate_source: str | None = None
+    bsr: int | None = None
+    rating: float | None = None
+    review_count: int | None = None
+    monthly_sold: int | None = None
+    latest_week_start: date | None = None
+    updated_at: datetime | None = None
+    categories: list[ProductCategorySightingOut] = Field(default_factory=list)
+    price_history: list[PriceHistoryPointOut] = Field(default_factory=list)
