@@ -1,4 +1,4 @@
-"""CLI entrypoints: python -m app scrape-prices"""
+"""CLI entrypoints: python -m app scrape-prices | pull-prod-db"""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import sys
 from app.config import get_settings
 from app.daily_prices import run_daily_price_scrape
 from app.db import SessionLocal, init_db
+from app.pull_prod_db import run_pull
 
 
 def _cmd_scrape_prices(_: argparse.Namespace) -> int:
@@ -33,6 +34,10 @@ def _cmd_scrape_prices(_: argparse.Namespace) -> int:
     return 0 if summary.succeeded > 0 or summary.requested == 0 else 2
 
 
+def _cmd_pull_prod_db(_: argparse.Namespace) -> int:
+    return run_pull()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -42,6 +47,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Scrape Amazon mobile prices for up to N weekly-tracked ASINs (no Easyparser)",
     )
     scrape.set_defaults(func=_cmd_scrape_prices)
+
+    pull = sub.add_parser(
+        "pull-prod-db",
+        help="Copy production Neon tables into local DATABASE_URL (backs up SQLite first)",
+    )
+    pull.set_defaults(func=_cmd_pull_prod_db)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

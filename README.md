@@ -48,7 +48,19 @@ Default local accounts are set in `.env` (not committed):
 
 Anyone must log in to view products. Sync endpoints require the admin role.
 
-Other targets: `make api`, `make web`, `make test`, `make scrape-prices`.
+Other targets: `make api`, `make web`, `make test`, `make scrape-prices`, `make db-pull`.
+
+### Copy production DB to local
+
+```bash
+make db-pull
+```
+
+Copies Neon production tables into your local `DATABASE_URL` (default SQLite). Backs up an existing SQLite file first.
+
+Source URL resolution order:
+1. `PROD_DATABASE_URL` (or `DATABASE_URL_PROD`) in `.env`
+2. `vercel env pull` from the linked `apps/api` project (`product-pulse-api`)
 
 ### Daily price scrape (local / cron)
 

@@ -8,7 +8,7 @@ UVICORN := $(VENV)/bin/uvicorn
 API_PORT ?= 8000
 WEB_PORT ?= 3000
 
-.PHONY: help install run dev api web test scrape-prices stop
+.PHONY: help install run dev api web test scrape-prices db-pull stop
 
 help:
 	@echo "Amazon Pulse / product-pulse"
@@ -19,6 +19,7 @@ help:
 	@echo "  make web            Start Next.js only"
 	@echo "  make test           Run API unit tests"
 	@echo "  make scrape-prices  Daily Amazon mobile price scrape (max 10 weekly ASINs)"
+	@echo "  make db-pull        Copy production Neon DB into local DATABASE_URL"
 	@echo ""
 	@echo "Requires .env with EASYPARSER_API_KEY (see .env.example)."
 
@@ -67,3 +68,9 @@ test: install
 scrape-prices: install
 	@set -a; source $(ROOT)/.env 2>/dev/null || true; set +a; \
 	cd $(API_DIR) && $(PYTHON) -m app scrape-prices
+
+# Replace local DB with a copy of production (Neon). Uses PROD_DATABASE_URL or Vercel env pull.
+db-pull: install
+	@set -a; source $(ROOT)/.env 2>/dev/null || true; set +a; \
+	cd $(API_DIR) && $(PYTHON) -m app pull-prod-db
+

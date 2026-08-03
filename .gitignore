@@ -1,4 +1,6 @@
 .env
+.env.vercel*
+*.backup-*.db
 .venv/
 venv/
 *.db
