@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.asin import parse_asin_from_input
 from app.config import Settings
-from app.math_estimates import price_change, week_start_for
-from app.models import Category, ProductSnapshot
-from app.schemas import CategoryOut, CategoryTopOut, TopProductOut
+from app.credits import credit_status, get_or_create_ledger, record_credit_usage
+from app.math_estimates import estimate_weekly_units, price_change, week_start_for
+from app.models import Category, Product, ProductSnapshot
+from app.providers.enrichment.easyparser import CreditBudgetExceeded, EasyparserClient
+from app.schemas import CategoryOut, CategoryTopOut, FeaturedProductAddOut, TopProductOut
 from app.sync import build_sync_status
 
 
@@ -121,3 +124,123 @@ def resolve_category(db: Session, category_id: int | str) -> Category | None:
 
 def current_week_start() -> date:
     return week_start_for(date.today())
+
+
+def add_product_to_featured(
+    db: Session,
+    *,
+    raw_input: str,
+    settings: Settings,
+) -> FeaturedProductAddOut:
+    asin = parse_asin_from_input(raw_input)
+    category = resolve_category(db, "featured")
+    if category is None:
+        raise LookupError("Featured category not found")
+
+    week_start = week_start_for(date.today())
+    ledger = get_or_create_ledger(db)
+    client = EasyparserClient(settings, credits_used_this_month=ledger.credits_used)
+    credits = credit_status(db, settings)
+
+    if not settings.easyparser_api_key.strip():
+        return FeaturedProductAddOut(
+            status="failed",
+            message=(
+                "EASYPARSER_API_KEY is empty. Save it in the project root .env and restart."
+            ),
+            asin=asin,
+            week_start=week_start,
+            credits_remaining_budget=credits["credits_remaining_budget"],
+        )
+
+    try:
+        client.ensure_budget(1)
+    except CreditBudgetExceeded as exc:
+        return FeaturedProductAddOut(
+            status="budget_exceeded",
+            message=str(exc),
+            asin=asin,
+            week_start=week_start,
+            credits_remaining_budget=credits["credits_remaining_budget"],
+        )
+
+    try:
+        enriched = client.get_detail(asin)
+    except Exception as exc:  # noqa: BLE001
+        credits = credit_status(db, settings)
+        return FeaturedProductAddOut(
+            status="failed",
+            message=str(exc),
+            asin=asin,
+            week_start=week_start,
+            credits_remaining_budget=credits["credits_remaining_budget"],
+        )
+
+    record_credit_usage(
+        db,
+        used=enriched.credit_used,
+        remaining_reported=client.last_credits_remaining,
+        settings=settings,
+    )
+
+    product = db.get(Product, asin)
+    if product is None:
+        product = Product(asin=asin)
+        db.add(product)
+
+    product.title = enriched.title or product.title
+    product.image_url = enriched.image_url or product.image_url
+    product.brand = enriched.brand or product.brand
+    product.product_url = enriched.product_url or product.product_url
+
+    sales = estimate_weekly_units(enriched.monthly_sold, enriched.bsr)
+
+    existing = db.scalar(
+        select(ProductSnapshot).where(
+            ProductSnapshot.category_id == category.id,
+            ProductSnapshot.asin == asin,
+            ProductSnapshot.week_start == week_start,
+        )
+    )
+    if existing is not None:
+        rank = existing.rank
+    else:
+        max_rank = db.scalar(
+            select(func.max(ProductSnapshot.rank)).where(
+                ProductSnapshot.category_id == category.id,
+                ProductSnapshot.week_start == week_start,
+            )
+        )
+        rank = (max_rank or 0) + 1
+        existing = ProductSnapshot(
+            category_id=category.id,
+            asin=asin,
+            week_start=week_start,
+            rank=rank,
+        )
+        db.add(existing)
+
+    existing.rank = rank
+    existing.price = enriched.price
+    existing.currency = enriched.currency
+    existing.bsr = enriched.bsr
+    existing.rating = enriched.rating
+    existing.review_count = enriched.review_count
+    existing.monthly_sold = enriched.monthly_sold
+    existing.estimated_weekly_units = sales.weekly_units
+    existing.sales_estimate_source = sales.source
+    existing.raw_json = enriched.raw
+    db.commit()
+
+    credits = credit_status(db, settings)
+    title = enriched.title or product.title
+    return FeaturedProductAddOut(
+        status="success",
+        message=f"Added {title or asin} to Featured (rank {rank})",
+        asin=asin,
+        title=title,
+        rank=rank,
+        credits_used=enriched.credit_used,
+        credits_remaining_budget=credits["credits_remaining_budget"],
+        week_start=week_start,
+    )

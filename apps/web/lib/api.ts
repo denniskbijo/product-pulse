@@ -1,3 +1,5 @@
+import { clearSession, loadSession, type Role } from "@/lib/auth";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export type Category = {
@@ -68,19 +70,51 @@ function formatApiError(text: string, status: number): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = loadSession();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (session?.accessToken) {
+    headers.Authorization = `Bearer ${session.accessToken}`;
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers,
     cache: "no-store",
   });
+
+  if (response.status === 401 && !path.startsWith("/auth/login")) {
+    clearSession();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+  }
+
   if (!response.ok) {
     const text = await response.text();
     throw new Error(formatApiError(text, response.status));
   }
   return response.json() as Promise<T>;
+}
+
+export type LoginResult = {
+  access_token: string;
+  token_type: string;
+  username: string;
+  role: Role;
+};
+
+export function login(username: string, password: string) {
+  return apiFetch<LoginResult>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export function getMe() {
+  return apiFetch<{ username: string; role: Role }>("/auth/me");
 }
 
 export function getCategories() {
@@ -104,5 +138,23 @@ export function triggerSync(idOrSlug: string | number, topN?: number) {
   const query = topN != null ? `?top_n=${topN}` : "";
   return apiFetch<SyncResult>(`/categories/${idOrSlug}/sync${query}`, {
     method: "POST",
+  });
+}
+
+export type FeaturedProductAddResult = {
+  status: "success" | "budget_exceeded" | "failed" | string;
+  message: string;
+  asin: string | null;
+  title: string | null;
+  rank: number | null;
+  credits_used: number;
+  credits_remaining_budget: number | null;
+  week_start: string | null;
+};
+
+export function addFeaturedProduct(input: string) {
+  return apiFetch<FeaturedProductAddResult>("/categories/featured/products", {
+    method: "POST",
+    body: JSON.stringify({ input }),
   });
 }

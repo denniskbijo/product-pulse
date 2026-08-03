@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
+  addFeaturedProduct,
   Category,
   CategoryTop,
   getCategories,
   getCategoryTop,
   triggerSync,
 } from "@/lib/api";
+import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
 
 function formatPrice(price: number | null, currency: string | null) {
   if (price == null) return "—";
@@ -41,6 +44,9 @@ function formatWhen(value: string | null) {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selected, setSelected] = useState<string>("home-kitchen");
   const [data, setData] = useState<CategoryTop | null>(null);
@@ -48,6 +54,15 @@ export default function HomePage() {
   const [pending, startTransition] = useTransition();
   const [syncing, setSyncing] = useState<"full" | "one" | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [featuredInput, setFeaturedInput] = useState("");
+  const [addingFeatured, setAddingFeatured] = useState(false);
+  const [featuredAddMessage, setFeaturedAddMessage] = useState<string | null>(
+    null,
+  );
+  const [featuredAddError, setFeaturedAddError] = useState<string | null>(null);
+
+  const admin = isAdmin(session);
+  const hasProducts = (data?.products.length ?? 0) > 0;
 
   const load = (slug: string) => {
     startTransition(async () => {
@@ -62,10 +77,22 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const current = loadSession();
+    if (!current) {
+      router.replace("/login");
+      return;
+    }
+    setSession(current);
+    setReady(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!ready || !session) return;
     getCategories()
       .then((cats) => {
         setCategories(cats);
-        const initial = cats.find((c) => c.slug === "home-kitchen")?.slug || cats[0]?.slug;
+        const initial =
+          cats.find((c) => c.slug === "home-kitchen")?.slug || cats[0]?.slug;
         if (initial) {
           setSelected(initial);
           load(initial);
@@ -75,15 +102,16 @@ export default function HomePage() {
         setError(err instanceof Error ? err.message : "Failed to load categories");
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ready, session?.accessToken]);
 
   const credits = data?.sync.credits;
   const creditLabel = useMemo(() => {
-    if (!credits) return "—";
+    if (!credits || !admin) return null;
     return `${credits.credits_remaining_budget} / ${credits.monthly_budget} budget left (${credits.month_key})`;
-  }, [credits]);
+  }, [credits, admin]);
 
   const onSync = async (topN?: number) => {
+    if (!admin) return;
     setSyncing(topN === 1 ? "one" : "full");
     setError(null);
     setSyncMessage(null);
@@ -101,14 +129,67 @@ export default function HomePage() {
     }
   };
 
+  const onLogout = () => {
+    clearSession();
+    router.replace("/login");
+  };
+
+  const onAddFeatured = async () => {
+    const input = featuredInput.trim();
+    if (!input) return;
+    setAddingFeatured(true);
+    setFeaturedAddMessage(null);
+    setFeaturedAddError(null);
+    try {
+      const result = await addFeaturedProduct(input);
+      if (result.status === "success") {
+        setFeaturedAddMessage(result.message);
+        setFeaturedInput("");
+        if (selected !== "featured") {
+          setSelected("featured");
+        }
+        load("featured");
+      } else if (result.status === "budget_exceeded" && !admin) {
+        setFeaturedAddError(
+          "Monthly enrichment limit reached. Contact an admin.",
+        );
+      } else {
+        setFeaturedAddError(result.message);
+      }
+    } catch (err) {
+      setFeaturedAddError(
+        err instanceof Error ? err.message : "Failed to add product",
+      );
+    } finally {
+      setAddingFeatured(false);
+    }
+  };
+
+  if (!ready || !session) {
+    return (
+      <main className="shell">
+        <p className="note">Checking session…</p>
+      </main>
+    );
+  }
+
   return (
     <main className="shell">
       <section className="hero">
-        <h1 className="brand">Amazon Pulse</h1>
+        <div className="hero-top">
+          <h1 className="brand">Amazon Pulse</h1>
+          <div className="session-bar">
+            <span className="note">
+              {session.username} · {session.role}
+            </span>
+            <button className="button secondary compact" onClick={onLogout}>
+              Log out
+            </button>
+          </div>
+        </div>
         <p className="lede">
           UK category top sellers — current price, estimated weekly volume, and
-          week-over-week price changes. Discovery from Amazon Best Sellers pages;
-          enrichment via Easyparser free credits.
+          7-day price changes.
         </p>
         <div className="controls">
           <div className="field">
@@ -129,38 +210,91 @@ export default function HomePage() {
               ))}
             </select>
           </div>
+          <div className="field field-featured">
+            <label htmlFor="featured-input">Featured ASIN or URL</label>
+            <input
+              id="featured-input"
+              type="text"
+              placeholder="B0… or amazon.co.uk/dp/…"
+              value={featuredInput}
+              onChange={(event) => setFeaturedInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void onAddFeatured();
+                }
+              }}
+              disabled={addingFeatured || pending}
+            />
+          </div>
           <button
             className="button secondary"
-            onClick={() => onSync(1)}
-            disabled={syncing != null || pending}
-            title="Enrich the #1 bestseller. Usually 1 Easyparser credit; 2 if Amazon HTML is blocked and SEARCH fallback is needed."
+            onClick={() => void onAddFeatured()}
+            disabled={addingFeatured || pending || !featuredInput.trim()}
           >
-            {syncing === "one" ? "Testing…" : "Test 1 product"}
+            {addingFeatured ? "Adding…" : "Add product"}
           </button>
+          {admin ? (
+            <>
+              <button
+                className={hasProducts ? "button secondary" : "button"}
+                onClick={() => onSync(1)}
+                disabled={syncing != null || pending}
+                title="Enrich the #1 product for this category"
+              >
+                {syncing === "one" ? "Syncing…" : "Sync 1 product"}
+              </button>
+              <button
+                className={hasProducts ? "button" : "button secondary"}
+                onClick={() => onSync()}
+                disabled={syncing != null || pending}
+              >
+                {syncing === "full" ? "Syncing…" : "Sync top 10"}
+              </button>
+            </>
+          ) : null}
+        </div>
+        {featuredAddMessage ? (
+          <p className="note">{featuredAddMessage}</p>
+        ) : null}
+        {featuredAddError ? (
+          <p className="error">{featuredAddError}</p>
+        ) : null}
+      </section>
+
+      {!hasProducts && admin ? (
+        <section className="empty-cta">
+          <h2>No products yet</h2>
+          <p className="note">
+            Run a sync to pull category data into the database. Cached results will
+            show here for everyone after that.
+          </p>
           <button
             className="button"
-            onClick={() => onSync()}
+            onClick={() => onSync(1)}
             disabled={syncing != null || pending}
           >
-            {syncing === "full" ? "Syncing…" : "Sync top 10"}
+            {syncing ? "Syncing…" : "Sync 1 product"}
           </button>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="status">
         <div>
           Last sync: <strong>{formatWhen(data?.sync.last_sync_at ?? null)}</strong>
-          {data?.sync.last_status ? ` · ${data.sync.last_status}` : ""}
+          {data?.sync.last_status && admin ? ` · ${data.sync.last_status}` : ""}
         </div>
-        <div>
-          Easyparser credits: <strong>{creditLabel}</strong>
-          {credits?.credits_remaining_reported != null
-            ? ` · provider reports ${credits.credits_remaining_reported} remaining`
-            : ""}
-        </div>
-        {syncMessage ? <p className="note">{syncMessage}</p> : null}
-        {data?.note ? <p className="note">{data.note}</p> : null}
-        {data?.sync.last_error ? (
+        {admin && creditLabel ? (
+          <div>
+            Easyparser credits: <strong>{creditLabel}</strong>
+            {credits?.credits_remaining_reported != null
+              ? ` · provider reports ${credits.credits_remaining_reported} remaining`
+              : ""}
+          </div>
+        ) : null}
+        {admin && syncMessage ? <p className="note">{syncMessage}</p> : null}
+        {admin && data?.note ? <p className="note">{data.note}</p> : null}
+        {admin && data?.sync.last_error ? (
           <p className="error">Last sync error: {data.sync.last_error}</p>
         ) : null}
         {error ? <p className="error">{error}</p> : null}
@@ -169,9 +303,7 @@ export default function HomePage() {
       <section className="table-wrap">
         {!data || data.products.length === 0 ? (
           <div className="empty">
-            {pending
-              ? "Loading…"
-              : "No products yet. Click Sync now (requires EASYPARSER_API_KEY)."}
+            {pending ? "Loading…" : "No products in the database yet."}
           </div>
         ) : (
           <table>
@@ -180,7 +312,7 @@ export default function HomePage() {
                 <th>Rank</th>
                 <th>Product</th>
                 <th>Price</th>
-                <th>WoW Δ</th>
+                <th>7-day Δ</th>
                 <th>Est. weekly units</th>
                 <th>BSR</th>
               </tr>
@@ -233,7 +365,11 @@ export default function HomePage() {
                         <span className="asin">{product.sales_estimate_source}</span>
                       ) : null}
                     </td>
-                    <td>{product.bsr != null ? product.bsr.toLocaleString("en-GB") : "—"}</td>
+                    <td>
+                      {product.bsr != null
+                        ? product.bsr.toLocaleString("en-GB")
+                        : "—"}
+                    </td>
                   </tr>
                 );
               })}
@@ -245,7 +381,7 @@ export default function HomePage() {
       <p className="footer">
         Sales units are estimates (Amazon “bought in past month” when available,
         otherwise a UK BSR curve). Prices come from Easyparser market observations.
-        Week-over-week price changes appear after the second weekly sync.
+        7-day price changes appear after the second weekly sync.
       </p>
     </main>
   );

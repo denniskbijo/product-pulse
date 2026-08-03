@@ -2,18 +2,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import AuthUser, get_current_user, require_admin
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.models import Category
-from app.schemas import CategoryOut, CategoryTopOut, SyncStatus, SyncTriggerOut
-from app.services import get_category_top, resolve_category
+from app.schemas import CategoryOut, CategoryTopOut, FeaturedProductAddIn, FeaturedProductAddOut, SyncStatus, SyncTriggerOut
+from app.services import add_product_to_featured, get_category_top, resolve_category
 from app.sync import build_sync_status, run_category_sync
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 @router.get("", response_model=list[CategoryOut])
-def list_categories(db: Session = Depends(get_db)) -> list[Category]:
+def list_categories(
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_current_user),
+) -> list[Category]:
     return list(db.scalars(select(Category).order_by(Category.name.asc())).all())
 
 
@@ -21,8 +25,30 @@ def list_categories(db: Session = Depends(get_db)) -> list[Category]:
 def global_sync_status(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    user: AuthUser = Depends(get_current_user),
 ) -> SyncStatus:
-    return build_sync_status(db, None, settings)
+    status = build_sync_status(db, None, settings)
+    if user.role != "admin":
+        # Hide credit budget details from viewers.
+        status.credits.credits_used = 0
+        status.credits.credits_remaining_budget = 0
+        status.credits.credits_remaining_reported = None
+    return status
+
+
+@router.post("/featured/products", response_model=FeaturedProductAddOut)
+def add_featured_product(
+    body: FeaturedProductAddIn,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    _: AuthUser = Depends(get_current_user),
+) -> FeaturedProductAddOut:
+    try:
+        return add_product_to_featured(db, raw_input=body.input, settings=settings)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/{category_id}/top", response_model=CategoryTopOut)
@@ -31,11 +57,18 @@ def category_top(
     window: str = Query(default="7d"),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    user: AuthUser = Depends(get_current_user),
 ) -> CategoryTopOut:
     category = resolve_category(db, category_id)
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
-    return get_category_top(db, category, settings, window=window)
+    payload = get_category_top(db, category, settings, window=window)
+    if user.role != "admin":
+        payload.sync.credits.credits_used = 0
+        payload.sync.credits.credits_remaining_budget = 0
+        payload.sync.credits.credits_remaining_reported = None
+        payload.sync.last_error = None
+    return payload
 
 
 @router.post("/{category_id}/sync", response_model=SyncTriggerOut)
@@ -49,6 +82,7 @@ def trigger_sync(
     ),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    _: AuthUser = Depends(require_admin),
 ) -> SyncTriggerOut:
     category = resolve_category(db, category_id)
     if category is None:

@@ -45,10 +45,78 @@ select {
   padding: 2.5rem 0 4rem;
 }
 
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 1rem;
+  padding: 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(15, 28, 24, 0.55);
+  box-shadow: var(--shadow);
+}
+
+.login-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.field input {
+  appearance: none;
+  background: rgba(15, 28, 24, 0.55);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  width: 100%;
+}
+
 .hero {
   display: grid;
   gap: 1rem;
   margin-bottom: 2rem;
+}
+
+.hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.session-bar {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.button.compact {
+  padding: 0.55rem 0.85rem;
+  font-size: 0.9rem;
+}
+
+.empty-cta {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(15, 28, 24, 0.45);
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.empty-cta h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
 }
 
 .brand {
@@ -94,6 +162,10 @@ select {
   border-radius: 12px;
   padding: 0.75rem 1rem;
   min-width: 220px;
+}
+
+.controls .field-featured input {
+  min-width: min(360px, 100%);
 }
 
 .button {

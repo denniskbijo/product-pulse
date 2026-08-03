@@ -66,3 +66,18 @@ class SyncTriggerOut(BaseModel):
     products_synced: int = 0
     credits_used: int = 0
     credits_remaining_budget: int | None = None
+
+
+class FeaturedProductAddIn(BaseModel):
+    input: str = Field(min_length=1)
+
+
+class FeaturedProductAddOut(BaseModel):
+    status: str
+    message: str
+    asin: str | None = None
+    title: str | None = None
+    rank: int | None = None
+    credits_used: int = 0
+    credits_remaining_budget: int | None = None
+    week_start: date | None = None

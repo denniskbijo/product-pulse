@@ -1,12 +1,12 @@
 # Amazon Pulse
 
-Amazon UK product research MVP: discover category top sellers from public Best Sellers pages, enrich with Easyparser (free 100 credits/month), and show price, estimated weekly volume, and week-over-week price changes.
+Amazon UK product research MVP: discover category top sellers from public Best Sellers pages, enrich with Easyparser (free 100 credits/month), and show price, estimated weekly volume, and 7-day price changes.
 
 ## Architecture
 
 - **Discover** — parse `amazon.co.uk/gp/bestsellers/...` HTML (0 Easyparser credits)
 - **Enrich** — Easyparser `DETAIL` for the top 10 ASINs (~10 credits/week)
-- **History** — Postgres weekly snapshots for WoW price deltas
+- **History** — Postgres weekly snapshots for 7-day price deltas
 
 ```
 amazon-pulse/
@@ -36,7 +36,16 @@ make install   # once
 make run       # API :8000 + web :3000
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000 and sign in.
+
+Default local accounts are set in `.env` (not committed):
+
+| Role | Username | Can sync | Sees credits |
+|---|---|---|---|
+| Admin | `admin` | Yes | Yes |
+| User | `basil` | No | No (sees last sync time + products) |
+
+Anyone must log in to view products. Sync endpoints require the admin role.
 
 Other targets: `make api`, `make web`, `make test`.
 

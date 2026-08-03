@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Amazon Pulse — UK category top sellers",
   description:
-    "Weekly top Amazon UK products by category with price, estimated volume, and week-over-week price changes.",
+    "Weekly top Amazon UK products by category with price, estimated volume, and 7-day price changes.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

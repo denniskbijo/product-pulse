@@ -5,6 +5,11 @@ from app.models import Category
 
 SEED_CATEGORIES = [
     {
+        "slug": "featured",
+        "name": "Featured",
+        "bestsellers_url": "https://www.amazon.co.uk/",
+    },
+    {
         "slug": "home-kitchen",
         "name": "Home & Kitchen",
         "bestsellers_url": "https://www.amazon.co.uk/gp/bestsellers/kitchen",
