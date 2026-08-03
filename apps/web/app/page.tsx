@@ -306,7 +306,7 @@ export default function HomePage() {
             {pending ? "Loading…" : "No products in the database yet."}
           </div>
         ) : (
-          <table>
+          <table className="product-table">
             <thead>
               <tr>
                 <th>Rank</th>
@@ -325,8 +325,8 @@ export default function HomePage() {
                 );
                 return (
                   <tr key={product.asin}>
-                    <td>#{product.rank}</td>
-                    <td>
+                    <td data-label="Rank">#{product.rank}</td>
+                    <td data-label="Product">
                       <div className="product">
                         {product.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -355,9 +355,13 @@ export default function HomePage() {
                         </div>
                       </div>
                     </td>
-                    <td>{formatPrice(product.price, product.currency)}</td>
-                    <td className={delta.className}>{delta.text}</td>
-                    <td>
+                    <td data-label="Price">
+                      {formatPrice(product.price, product.currency)}
+                    </td>
+                    <td data-label="7-day Δ" className={delta.className}>
+                      {delta.text}
+                    </td>
+                    <td data-label="Est. weekly units">
                       {product.estimated_weekly_units != null
                         ? `~${product.estimated_weekly_units}`
                         : "—"}
@@ -365,7 +369,7 @@ export default function HomePage() {
                         <span className="asin">{product.sales_estimate_source}</span>
                       ) : null}
                     </td>
-                    <td>
+                    <td data-label="Best Sellers Rank">
                       {product.bsr != null
                         ? product.bsr.toLocaleString("en-GB")
                         : "—"}

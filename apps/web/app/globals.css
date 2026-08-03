@@ -221,12 +221,12 @@ select {
   border-radius: 18px;
   background: rgba(10, 18, 15, 0.5);
   box-shadow: var(--shadow);
+  -webkit-overflow-scrolling: touch;
 }
 
-table {
+.product-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
 }
 
 th,
@@ -316,5 +316,117 @@ tr:last-child td {
 
   .brand {
     font-size: 2.2rem;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .field select,
+  .controls .field-featured input,
+  .controls .button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .session-bar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .table-wrap {
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .product-table,
+  .product-table thead,
+  .product-table tbody,
+  .product-table th,
+  .product-table td,
+  .product-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .product-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .product-table tr {
+    margin-bottom: 0.85rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(10, 18, 15, 0.55);
+    box-shadow: var(--shadow);
+  }
+
+  .product-table tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .product-table td {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 38%) 1fr;
+    gap: 0.65rem;
+    align-items: start;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .product-table td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .product-table td:first-child {
+    padding-top: 0;
+  }
+
+  .product-table td::before {
+    content: attr(data-label);
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    padding-top: 0.2rem;
+  }
+
+  .product-table td[data-label="Product"] {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .product-table td[data-label="Product"]::before {
+    display: none;
+  }
+
+  .product {
+    align-items: flex-start;
+  }
+
+  .thumb {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+
+  .footer {
+    font-size: 0.8rem;
   }
 }
