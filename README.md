@@ -6,7 +6,8 @@ Amazon UK product research MVP: discover category top sellers from public Best S
 
 - **Discover** — parse `amazon.co.uk/gp/bestsellers/...` HTML (0 Easyparser credits)
 - **Enrich** — Easyparser `DETAIL` for the top 10 ASINs (~10 credits/week)
-- **History** — Postgres weekly snapshots for 7-day price deltas
+- **Weekly history** — `product_snapshots` for BSR, sales estimates, and week-vs-week fallback
+- **Daily prices** — Amazon mobile pages (`/gp/aw/d/{ASIN}`) for up to 10 weekly ASINs via `make scrape-prices` (no Easyparser; polite delay). Powers 7-day Δ when enough daily points exist.
 
 ```
 amazon-pulse/
@@ -47,7 +48,15 @@ Default local accounts are set in `.env` (not committed):
 
 Anyone must log in to view products. Sync endpoints require the admin role.
 
-Other targets: `make api`, `make web`, `make test`.
+Other targets: `make api`, `make web`, `make test`, `make scrape-prices`.
+
+### Daily price scrape (local / cron)
+
+```bash
+make scrape-prices
+```
+
+Picks up to `DAILY_SCRAPE_MAX` (default 10) unique ASINs from the latest weekly snapshot set, fetches each mobile product page with `DAILY_SCRAPE_DELAY_SECONDS` between requests, and upserts `daily_price_points`. Weekly Easyparser sync is unchanged and still owns rich fields (BSR, monthly sold, etc.).
 
 ## Deploy on Vercel
 

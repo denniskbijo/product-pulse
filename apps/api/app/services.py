@@ -9,7 +9,7 @@ from app.asin import parse_asin_from_input
 from app.config import Settings
 from app.credits import credit_status, get_or_create_ledger, record_credit_usage
 from app.math_estimates import estimate_weekly_units, price_change, week_start_for
-from app.models import Category, Product, ProductSnapshot
+from app.models import Category, DailyPricePoint, Product, ProductSnapshot
 from app.providers.enrichment.easyparser import CreditBudgetExceeded, EasyparserClient
 from app.schemas import CategoryOut, CategoryTopOut, FeaturedProductAddOut, TopProductOut
 from app.sync import build_sync_status
@@ -22,6 +22,32 @@ def _latest_week_start(db: Session, category_id: int) -> date | None:
         .order_by(ProductSnapshot.week_start.desc())
         .limit(1)
     )
+
+
+def _daily_prices_by_asin(
+    db: Session,
+    asins: list[str],
+    *,
+    on_or_before: date,
+) -> dict[str, DailyPricePoint]:
+    """Latest successful daily price for each ASIN on/before on_or_before."""
+    if not asins:
+        return {}
+    rows = db.scalars(
+        select(DailyPricePoint)
+        .where(
+            DailyPricePoint.asin.in_(asins),
+            DailyPricePoint.observed_on <= on_or_before,
+            DailyPricePoint.status == "success",
+            DailyPricePoint.price.is_not(None),
+        )
+        .order_by(DailyPricePoint.asin.asc(), DailyPricePoint.observed_on.desc())
+    ).all()
+    latest: dict[str, DailyPricePoint] = {}
+    for row in rows:
+        if row.asin not in latest:
+            latest[row.asin] = row
+    return latest
 
 
 def get_category_top(
@@ -68,12 +94,40 @@ def get_category_top(
         ).all()
     }
 
-    price_history_ready = bool(previous_by_asin)
+    asins = [row.asin for row in current_rows]
+    today = date.today()
+    week_ago = today - timedelta(days=7)
+    daily_now = _daily_prices_by_asin(db, asins, on_or_before=today)
+    daily_prev = _daily_prices_by_asin(db, asins, on_or_before=week_ago)
+
+    price_history_ready = False
     products: list[TopProductOut] = []
     for row in current_rows:
-        prev = previous_by_asin.get(row.asin)
-        delta = price_change(row.price, prev.price if prev else None)
         product = row.product
+        now_daily = daily_now.get(row.asin)
+        prev_daily = daily_prev.get(row.asin)
+
+        display_price = now_daily.price if now_daily else row.price
+        display_currency = (
+            (now_daily.currency if now_daily and now_daily.currency else None)
+            or row.currency
+            or "GBP"
+        )
+
+        # Prefer true ~7-day daily history; fall back to week-vs-week snapshots.
+        if (
+            now_daily
+            and prev_daily
+            and now_daily.observed_on != prev_daily.observed_on
+        ):
+            delta = price_change(now_daily.price, prev_daily.price)
+            price_history_ready = True
+        else:
+            prev = previous_by_asin.get(row.asin)
+            delta = price_change(row.price, prev.price if prev else None)
+            if prev is not None:
+                price_history_ready = True
+
         products.append(
             TopProductOut(
                 rank=row.rank,
@@ -84,8 +138,8 @@ def get_category_top(
                 product_url=product.product_url
                 if product and product.product_url
                 else f"https://www.amazon.co.uk/dp/{row.asin}",
-                price=row.price,
-                currency=row.currency or "GBP",
+                price=display_price,
+                currency=display_currency,
                 price_change_absolute=delta.absolute,
                 price_change_percent=delta.percent,
                 estimated_weekly_units=row.estimated_weekly_units,
@@ -100,8 +154,8 @@ def get_category_top(
     note = None
     if not price_history_ready:
         note = (
-            "Price change available after the next weekly sync "
-            f"(current week start {week_start.isoformat()})."
+            "7-day price change appears after daily scrapes accumulate "
+            "(or after a second weekly sync)."
         )
 
     return CategoryTopOut(

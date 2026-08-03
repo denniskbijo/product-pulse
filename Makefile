@@ -8,16 +8,17 @@ UVICORN := $(VENV)/bin/uvicorn
 API_PORT ?= 8000
 WEB_PORT ?= 3000
 
-.PHONY: help install run dev api web test stop
+.PHONY: help install run dev api web test scrape-prices stop
 
 help:
 	@echo "Amazon Pulse / product-pulse"
 	@echo ""
-	@echo "  make install  Install API + web dependencies"
-	@echo "  make run      Start API (:$(API_PORT)) and web (:$(WEB_PORT)) together"
-	@echo "  make api      Start API only"
-	@echo "  make web      Start Next.js only"
-	@echo "  make test     Run API unit tests"
+	@echo "  make install        Install API + web dependencies"
+	@echo "  make run            Start API (:$(API_PORT)) and web (:$(WEB_PORT)) together"
+	@echo "  make api            Start API only"
+	@echo "  make web            Start Next.js only"
+	@echo "  make test           Run API unit tests"
+	@echo "  make scrape-prices  Daily Amazon mobile price scrape (max 10 weekly ASINs)"
 	@echo ""
 	@echo "Requires .env with EASYPARSER_API_KEY (see .env.example)."
 
@@ -61,3 +62,8 @@ web: install
 
 test: install
 	cd $(API_DIR) && $(VENV)/bin/pytest -q
+
+# Local/cron: scrape up to DAILY_SCRAPE_MAX prices via Amazon mobile pages (no Easyparser).
+scrape-prices: install
+	@set -a; source $(ROOT)/.env 2>/dev/null || true; set +a; \
+	cd $(API_DIR) && $(PYTHON) -m app scrape-prices

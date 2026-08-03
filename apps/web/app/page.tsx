@@ -380,9 +380,10 @@ export default function HomePage() {
 
       <p className="footer">
         Sales units are estimates (Amazon “bought in past month” when available,
-        otherwise a UK Best Sellers Rank curve). Prices come from Easyparser
-        market observations. 7-day price changes appear after the second weekly
-        sync.
+        otherwise a UK Best Sellers Rank curve). Rich fields come from weekly
+        Easyparser sync; daily prices come from Amazon mobile pages
+        (`make scrape-prices`, max 10). 7-day Δ prefers daily history when
+        available.
       </p>
     </main>
   );
