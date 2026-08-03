@@ -314,7 +314,7 @@ export default function HomePage() {
                 <th>Price</th>
                 <th>7-day Δ</th>
                 <th>Est. weekly units</th>
-                <th>BSR</th>
+                <th>Best Sellers Rank</th>
               </tr>
             </thead>
             <tbody>
@@ -380,8 +380,9 @@ export default function HomePage() {
 
       <p className="footer">
         Sales units are estimates (Amazon “bought in past month” when available,
-        otherwise a UK BSR curve). Prices come from Easyparser market observations.
-        7-day price changes appear after the second weekly sync.
+        otherwise a UK Best Sellers Rank curve). Prices come from Easyparser
+        market observations. 7-day price changes appear after the second weekly
+        sync.
       </p>
     </main>
   );
