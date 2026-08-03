@@ -16,6 +16,7 @@ export type TopProduct = {
   image_url: string | null;
   brand: string | null;
   product_url: string | null;
+  notes: string | null;
   price: number | null;
   currency: string | null;
   price_change_absolute: number | null;
@@ -172,6 +173,7 @@ export type ProductDetail = {
   image_url: string | null;
   brand: string | null;
   product_url: string | null;
+  notes: string | null;
   price: number | null;
   currency: string | null;
   price_change_absolute: number | null;
@@ -196,4 +198,34 @@ export type ProductDetail = {
 
 export function getProductDetail(asin: string) {
   return apiFetch<ProductDetail>(`/products/${encodeURIComponent(asin)}`);
+}
+
+export type ProductNotesResult = {
+  asin: string;
+  notes: string | null;
+};
+
+export function updateProductNotes(asin: string, notes: string | null) {
+  return apiFetch<ProductNotesResult>(`/products/${encodeURIComponent(asin)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export type ProductRemoveResult = {
+  status: string;
+  message: string;
+  asin: string;
+  category_id: number;
+  snapshots_removed: number;
+};
+
+export function removeProductFromCategory(
+  categoryIdOrSlug: string | number,
+  asin: string,
+) {
+  return apiFetch<ProductRemoveResult>(
+    `/categories/${categoryIdOrSlug}/products/${encodeURIComponent(asin)}`,
+    { method: "DELETE" },
+  );
 }

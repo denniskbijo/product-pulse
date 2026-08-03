@@ -8,8 +8,10 @@ import {
   CategoryTop,
   getCategories,
   getCategoryTop,
+  removeProductFromCategory,
   TopProduct,
   triggerSync,
+  updateProductNotes,
 } from "@/lib/api";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
 
@@ -68,7 +70,43 @@ function ProductIdentity({ product }: { product: TopProduct }) {
           {product.title || product.asin}
         </a>
         <span className="asin">{product.asin}</span>
+        {product.notes ? (
+          <span className="product-notes">{product.notes}</span>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function ProductActions({
+  product,
+  busy,
+  onEditNotes,
+  onDelete,
+}: {
+  product: TopProduct;
+  busy: boolean;
+  onEditNotes: (product: TopProduct) => void;
+  onDelete: (product: TopProduct) => void;
+}) {
+  return (
+    <div className="product-actions">
+      <button
+        type="button"
+        className="button secondary compact"
+        disabled={busy}
+        onClick={() => onEditNotes(product)}
+      >
+        Edit notes
+      </button>
+      <button
+        type="button"
+        className="button danger compact"
+        disabled={busy}
+        onClick={() => onDelete(product)}
+      >
+        Delete
+      </button>
     </div>
   );
 }
@@ -90,6 +128,14 @@ export default function HomePage() {
     null,
   );
   const [featuredAddError, setFeaturedAddError] = useState<string | null>(null);
+  const [actionAsin, setActionAsin] = useState<string | null>(null);
+  const [notesEditor, setNotesEditor] = useState<{
+    asin: string;
+    title: string;
+    notes: string;
+  } | null>(null);
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
 
   const admin = isAdmin(session);
   const hasProducts = (data?.products.length ?? 0) > 0;
@@ -193,6 +239,48 @@ export default function HomePage() {
       );
     } finally {
       setAddingFeatured(false);
+    }
+  };
+
+  const onEditNotes = (product: TopProduct) => {
+    setNotesError(null);
+    setNotesEditor({
+      asin: product.asin,
+      title: product.title || product.asin,
+      notes: product.notes || "",
+    });
+  };
+
+  const onSaveNotes = async () => {
+    if (!notesEditor) return;
+    setNotesSaving(true);
+    setNotesError(null);
+    try {
+      await updateProductNotes(notesEditor.asin, notesEditor.notes);
+      setNotesEditor(null);
+      load(selected);
+    } catch (err) {
+      setNotesError(err instanceof Error ? err.message : "Failed to save notes");
+    } finally {
+      setNotesSaving(false);
+    }
+  };
+
+  const onDeleteProduct = async (product: TopProduct) => {
+    const label = product.title || product.asin;
+    const ok = window.confirm(
+      `Remove “${label}” from this category list? Price history is kept.`,
+    );
+    if (!ok) return;
+    setActionAsin(product.asin);
+    setError(null);
+    try {
+      await removeProductFromCategory(selected, product.asin);
+      load(selected);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove product");
+    } finally {
+      setActionAsin(null);
     }
   };
 
@@ -349,6 +437,43 @@ export default function HomePage() {
         {error ? <p className="error">{error}</p> : null}
       </section>
 
+      {notesEditor ? (
+        <section className="notes-editor" aria-label="Edit product notes">
+          <div className="notes-editor-head">
+            <h2>Notes</h2>
+            <p className="note">{notesEditor.title}</p>
+          </div>
+          <textarea
+            value={notesEditor.notes}
+            onChange={(e) =>
+              setNotesEditor({ ...notesEditor, notes: e.target.value })
+            }
+            rows={4}
+            placeholder="Add a note about this product…"
+            disabled={notesSaving}
+          />
+          {notesError ? <p className="error">{notesError}</p> : null}
+          <div className="notes-editor-actions">
+            <button
+              type="button"
+              className="button secondary compact"
+              disabled={notesSaving}
+              onClick={() => setNotesEditor(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button compact"
+              disabled={notesSaving}
+              onClick={onSaveNotes}
+            >
+              {notesSaving ? "Saving…" : "Save notes"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="products-section">
         {!data || data.products.length === 0 ? (
           <div className="empty">
@@ -362,6 +487,7 @@ export default function HomePage() {
                   product.price_change_absolute,
                   product.price_change_percent,
                 );
+                const busy = actionAsin === product.asin;
                 return (
                   <li key={product.asin} className="product-card">
                     <div className="product-card-top">
@@ -399,6 +525,12 @@ export default function HomePage() {
                         </dd>
                       </div>
                     </dl>
+                    <ProductActions
+                      product={product}
+                      busy={busy}
+                      onEditNotes={onEditNotes}
+                      onDelete={onDeleteProduct}
+                    />
                   </li>
                 );
               })}
@@ -414,6 +546,7 @@ export default function HomePage() {
                     <th>7-day Δ</th>
                     <th>Est. weekly units</th>
                     <th>Best Sellers Rank</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -422,6 +555,7 @@ export default function HomePage() {
                       product.price_change_absolute,
                       product.price_change_percent,
                     );
+                    const busy = actionAsin === product.asin;
                     return (
                       <tr key={product.asin}>
                         <td>#{product.rank}</td>
@@ -444,6 +578,14 @@ export default function HomePage() {
                           {product.bsr != null
                             ? product.bsr.toLocaleString("en-GB")
                             : "—"}
+                        </td>
+                        <td>
+                          <ProductActions
+                            product={product}
+                            busy={busy}
+                            onEditNotes={onEditNotes}
+                            onDelete={onDeleteProduct}
+                          />
                         </td>
                       </tr>
                     );

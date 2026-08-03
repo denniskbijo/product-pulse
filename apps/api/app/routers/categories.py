@@ -6,8 +6,21 @@ from app.auth import AuthUser, get_current_user, require_admin
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.models import Category
-from app.schemas import CategoryOut, CategoryTopOut, FeaturedProductAddIn, FeaturedProductAddOut, SyncStatus, SyncTriggerOut
-from app.services import add_product_to_featured, get_category_top, resolve_category
+from app.schemas import (
+    CategoryOut,
+    CategoryTopOut,
+    FeaturedProductAddIn,
+    FeaturedProductAddOut,
+    ProductRemoveOut,
+    SyncStatus,
+    SyncTriggerOut,
+)
+from app.services import (
+    add_product_to_featured,
+    get_category_top,
+    remove_product_from_category,
+    resolve_category,
+)
 from app.sync import build_sync_status, run_category_sync
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -47,6 +60,25 @@ def add_featured_product(
         return add_product_to_featured(db, raw_input=body.input, settings=settings)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/{category_id}/products/{asin}",
+    response_model=ProductRemoveOut,
+)
+def delete_category_product(
+    category_id: str,
+    asin: str,
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_current_user),
+) -> ProductRemoveOut:
+    category = resolve_category(db, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    try:
+        return remove_product_from_category(db, category, asin)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

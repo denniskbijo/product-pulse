@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getProductDetail, type ProductDetail } from "@/lib/api";
+import {
+  getProductDetail,
+  updateProductNotes,
+  type ProductDetail,
+} from "@/lib/api";
 import { clearSession, loadSession } from "@/lib/auth";
 
 function formatPrice(price: number | null, currency: string | null) {
@@ -79,6 +83,10 @@ export default function ProductDetailPage() {
   const [detail, setDetail] = useState<ProductDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesMessage, setNotesMessage] = useState<string | null>(null);
+  const [notesError, setNotesError] = useState<string | null>(null);
 
   useEffect(() => {
     const session = loadSession();
@@ -98,6 +106,7 @@ export default function ProductDetailPage() {
       .then((data) => {
         if (!cancelled) {
           setDetail(data);
+          setNotesDraft(data.notes || "");
           setError(null);
         }
       })
@@ -120,6 +129,23 @@ export default function ProductDetailPage() {
     detail?.price_change_absolute ?? null,
     detail?.price_change_percent ?? null,
   );
+
+  const onSaveNotes = async () => {
+    if (!detail) return;
+    setNotesSaving(true);
+    setNotesMessage(null);
+    setNotesError(null);
+    try {
+      const result = await updateProductNotes(detail.asin, notesDraft);
+      setDetail({ ...detail, notes: result.notes });
+      setNotesDraft(result.notes || "");
+      setNotesMessage("Notes saved.");
+    } catch (err) {
+      setNotesError(err instanceof Error ? err.message : "Failed to save notes");
+    } finally {
+      setNotesSaving(false);
+    }
+  };
 
   return (
     <main className="shell detail-shell">
@@ -181,6 +207,30 @@ export default function ProductDetailPage() {
                   View on Amazon UK
                 </a>
               </div>
+            </div>
+          </section>
+
+          <section className="detail-panel notes-editor">
+            <h2>Notes</h2>
+            <p className="note">Private notes for this ASIN — shared across categories.</p>
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              rows={4}
+              placeholder="Add a note about this product…"
+              disabled={notesSaving}
+            />
+            {notesMessage ? <p className="note">{notesMessage}</p> : null}
+            {notesError ? <p className="error">{notesError}</p> : null}
+            <div className="notes-editor-actions">
+              <button
+                type="button"
+                className="button compact"
+                disabled={notesSaving}
+                onClick={onSaveNotes}
+              >
+                {notesSaving ? "Saving…" : "Save notes"}
+              </button>
             </div>
           </section>
 

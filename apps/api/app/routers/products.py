@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import AuthUser, get_current_user
 from app.db import get_db
-from app.schemas import ProductDetailOut
-from app.services import get_product_detail
+from app.schemas import ProductDetailOut, ProductNotesIn, ProductNotesOut
+from app.services import get_product_detail, update_product_notes
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -19,3 +19,16 @@ def product_detail(
     if detail is None:
         raise HTTPException(status_code=404, detail="Product not found")
     return detail
+
+
+@router.patch("/{asin}", response_model=ProductNotesOut)
+def patch_product_notes(
+    asin: str,
+    body: ProductNotesIn,
+    db: Session = Depends(get_db),
+    _: AuthUser = Depends(get_current_user),
+) -> ProductNotesOut:
+    result = update_product_notes(db, asin, body.notes)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return result

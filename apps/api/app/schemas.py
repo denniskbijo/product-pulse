@@ -36,6 +36,7 @@ class TopProductOut(BaseModel):
     image_url: str | None = None
     brand: str | None = None
     product_url: str | None = None
+    notes: str | None = None
     price: float | None = None
     currency: str | None = "GBP"
     price_change_absolute: float | None = None
@@ -83,6 +84,23 @@ class FeaturedProductAddOut(BaseModel):
     week_start: date | None = None
 
 
+class ProductNotesIn(BaseModel):
+    notes: str | None = None
+
+
+class ProductNotesOut(BaseModel):
+    asin: str
+    notes: str | None = None
+
+
+class ProductRemoveOut(BaseModel):
+    status: str
+    message: str
+    asin: str
+    category_id: int
+    snapshots_removed: int = 0
+
+
 class PriceHistoryPointOut(BaseModel):
     date: date
     price: float
@@ -103,6 +121,7 @@ class ProductDetailOut(BaseModel):
     image_url: str | None = None
     brand: str | None = None
     product_url: str | None = None
+    notes: str | None = None
     price: float | None = None
     currency: str | None = "GBP"
     price_change_absolute: float | None = None

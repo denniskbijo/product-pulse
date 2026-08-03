@@ -188,6 +188,12 @@ select {
   border: 1px solid var(--line);
 }
 
+.button.danger {
+  background: transparent;
+  color: #f0a8a0;
+  border: 1px solid rgba(240, 168, 160, 0.45);
+}
+
 .button:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.05);
@@ -196,6 +202,68 @@ select {
 .button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.product-table .product-actions {
+  margin-top: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.product-notes {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--accent-2);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.notes-editor {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(15, 28, 24, 0.65);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.notes-editor h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.notes-editor-head {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.notes-editor textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 6rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  background: rgba(10, 18, 15, 0.75);
+  color: var(--ink);
+  font: inherit;
+}
+
+.notes-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
 }
 
 .status {
@@ -302,7 +370,7 @@ select {
 .product-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  min-width: 900px;
 }
 
 th,

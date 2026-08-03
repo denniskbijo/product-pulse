@@ -18,6 +18,8 @@ from app.schemas import (
     PriceHistoryPointOut,
     ProductCategorySightingOut,
     ProductDetailOut,
+    ProductNotesOut,
+    ProductRemoveOut,
     TopProductOut,
 )
 from app.sync import build_sync_status
@@ -146,6 +148,7 @@ def get_category_top(
                 product_url=product.product_url
                 if product and product.product_url
                 else f"https://www.amazon.co.uk/dp/{row.asin}",
+                notes=product.notes if product else None,
                 price=display_price,
                 currency=display_currency,
                 price_change_absolute=delta.absolute,
@@ -434,6 +437,7 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         image_url=product.image_url,
         brand=product.brand,
         product_url=product.product_url or f"https://www.amazon.co.uk/dp/{asin}",
+        notes=product.notes,
         price=display_price,
         currency=display_currency,
         price_change_absolute=delta.absolute,
@@ -449,4 +453,47 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         updated_at=product.updated_at,
         categories=categories,
         price_history=price_history,
+    )
+
+
+def update_product_notes(
+    db: Session, asin: str, notes: str | None
+) -> ProductNotesOut | None:
+    asin = asin.strip().upper()
+    product = db.get(Product, asin)
+    if product is None:
+        return None
+    cleaned = notes.strip() if notes else ""
+    product.notes = cleaned or None
+    db.commit()
+    db.refresh(product)
+    return ProductNotesOut(asin=product.asin, notes=product.notes)
+
+
+def remove_product_from_category(
+    db: Session, category: Category, asin: str
+) -> ProductRemoveOut:
+    """Remove all weekly snapshots for this ASIN in the given category."""
+    asin = asin.strip().upper()
+    snapshots = list(
+        db.scalars(
+            select(ProductSnapshot).where(
+                ProductSnapshot.category_id == category.id,
+                ProductSnapshot.asin == asin,
+            )
+        ).all()
+    )
+    if not snapshots:
+        raise LookupError(f"Product {asin} is not in {category.name}")
+
+    for snap in snapshots:
+        db.delete(snap)
+    db.commit()
+
+    return ProductRemoveOut(
+        status="success",
+        message=f"Removed {asin} from {category.name}",
+        asin=asin,
+        category_id=category.id,
+        snapshots_removed=len(snapshots),
     )

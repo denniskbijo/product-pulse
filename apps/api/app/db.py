@@ -41,7 +41,21 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _ensure_columns() -> None:
+    """Add columns that create_all will not alter onto existing tables."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "products" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("products")}
+    if "notes" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE products ADD COLUMN notes TEXT"))
+
+
 def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
