@@ -45,6 +45,9 @@ async def lifespan(_: FastAPI):
     db = SessionLocal()
     try:
         seed_categories(db)
+    except Exception:  # noqa: BLE001
+        # Never block the whole API on a seed/migration hiccup.
+        db.rollback()
     finally:
         db.close()
 
