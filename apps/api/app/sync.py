@@ -86,20 +86,8 @@ def run_category_sync(
 
         client.ensure_budget(len(entries))
 
-        # Full top-N sync replaces this week's ranked set. Partial sync (e.g. Sync 1)
-        # only upserts discovered ASINs and keeps other products for the week.
-        replace_week_set = top_n >= settings.sync_top_n
-        if replace_week_set:
-            old_rows = db.scalars(
-                select(ProductSnapshot).where(
-                    ProductSnapshot.category_id == category.id,
-                    ProductSnapshot.week_start == week_start,
-                )
-            ).all()
-            for row in old_rows:
-                db.delete(row)
-            db.flush()
-
+        # Always upsert discovered ASINs. Never wipe other products already stored
+        # for this category/week (Sync 1 and Sync top 10 both preserve existing rows).
         for entry in entries:
             enriched = client.get_detail(entry.asin)
             credits_this_run += enriched.credit_used
@@ -124,7 +112,15 @@ def run_category_sync(
                 )
             )
             if existing is None:
-                if replace_week_set:
+                # Prefer discovery rank when free; otherwise append after current max.
+                rank_taken = db.scalar(
+                    select(ProductSnapshot.id).where(
+                        ProductSnapshot.category_id == category.id,
+                        ProductSnapshot.week_start == week_start,
+                        ProductSnapshot.rank == entry.rank,
+                    )
+                )
+                if rank_taken is None:
                     rank = entry.rank
                 else:
                     max_rank = db.scalar(
@@ -141,8 +137,9 @@ def run_category_sync(
                     rank=rank,
                 )
                 db.add(existing)
-            elif replace_week_set:
-                existing.rank = entry.rank
+            else:
+                # Refresh data in place; keep the product's existing rank.
+                pass
 
             existing.price = enriched.price
             existing.currency = enriched.currency
