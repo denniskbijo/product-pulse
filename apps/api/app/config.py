@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     amazon_domain: str = ".co.uk"
     amazon_marketplace_host: str = "www.amazon.co.uk"
 
+    # Auth (env-configured accounts; passwords compared as plain secrets)
+    jwt_secret: str = ""
+    jwt_expire_hours: int = 72
+    admin_username: str = "admin"
+    admin_password: str = ""
+    user_username: str = "basil"
+    user_password: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
