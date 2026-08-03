@@ -16,3 +16,24 @@ export function formatPriceHistorySource(source: string): string {
   if (source === "weekly_snapshot") return "Weekly update";
   return source;
 }
+
+export function formatPriceChange(
+  absolute: number | null,
+  percent: number | null,
+): { text: string; className: string } {
+  if (absolute == null) {
+    return { text: "No history yet", className: "flat" };
+  }
+  const sign = absolute > 0 ? "+" : "";
+  const pct = percent == null ? "" : ` (${sign}${percent.toFixed(1)}%)`;
+  const className = absolute > 0 ? "up" : absolute < 0 ? "down" : "flat";
+  return {
+    text: `${sign}${absolute.toFixed(2)}${pct}`,
+    className,
+  };
+}
+
+export function formatBsr(bsr: number | null | undefined): string {
+  if (bsr == null) return "Unavailable";
+  return bsr.toLocaleString("en-GB");
+}

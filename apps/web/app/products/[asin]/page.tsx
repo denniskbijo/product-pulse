@@ -9,7 +9,9 @@ import {
 } from "@/lib/api";
 import { clearSession, loadSession } from "@/lib/auth";
 import {
+  formatBsr,
   formatEstimateSource,
+  formatPriceChange,
   formatPriceHistorySource,
 } from "@/lib/labels";
 
@@ -23,17 +25,6 @@ function formatPrice(price: number | null, currency: string | null) {
   } catch {
     return `£${price.toFixed(2)}`;
   }
-}
-
-function formatDelta(absolute: number | null, percent: number | null) {
-  if (absolute == null) return { text: "Collecting…", className: "flat" };
-  const sign = absolute > 0 ? "+" : "";
-  const pct = percent == null ? "" : ` (${sign}${percent.toFixed(1)}%)`;
-  const className = absolute > 0 ? "up" : absolute < 0 ? "down" : "flat";
-  return {
-    text: `${sign}${absolute.toFixed(2)}${pct}`,
-    className,
-  };
 }
 
 function PriceSparkline({
@@ -129,7 +120,7 @@ export default function ProductDetailPage() {
     };
   }, [asin, router]);
 
-  const delta = formatDelta(
+  const delta = formatPriceChange(
     detail?.price_change_absolute ?? null,
     detail?.price_change_percent ?? null,
   );
@@ -195,7 +186,7 @@ export default function ProductDetailPage() {
                   </strong>
                 </div>
                 <div>
-                  <span className="metric-label">7-day change</span>
+                  <span className="metric-label">7-day price change</span>
                   <strong className={delta.className}>{delta.text}</strong>
                 </div>
               </div>
@@ -250,11 +241,7 @@ export default function ProductDetailPage() {
             <dl className="detail-grid">
               <div>
                 <dt>Best Sellers Rank</dt>
-                <dd>
-                  {detail.bsr != null
-                    ? detail.bsr.toLocaleString("en-GB")
-                    : "—"}
-                </dd>
+                <dd>{formatBsr(detail.bsr)}</dd>
               </div>
               <div>
                 <dt>Est. weekly units</dt>

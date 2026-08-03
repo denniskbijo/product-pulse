@@ -1,5 +1,9 @@
 from app.config import Settings
-from app.providers.enrichment.easyparser import EasyparserClient, parse_detail_payload
+from app.providers.enrichment.easyparser import (
+    EasyparserClient,
+    parse_bestsellers_rank_payload,
+    parse_detail_payload,
+)
 
 
 def test_parse_detail_payload_nested_result_detail():
@@ -31,6 +35,38 @@ def test_parse_detail_payload_nested_result_detail():
     assert product.review_count == 1234
     assert product.credits_remaining == 97
     assert product.image_url == "https://example.com/img.jpg"
+
+
+def test_parse_bestsellers_rank_operation():
+    body = {
+        "request_info": {"success": True, "credit_used_this_request": 1},
+        "result": {
+            "country_code": "GB",
+            "product": {
+                "asin": "B09RKS585V",
+                "bestseller": {
+                    "context_name": "Handmade Products",
+                    "rank": 3,
+                    "sub_category_id": "51708350",
+                },
+            },
+        },
+    }
+    assert parse_bestsellers_rank_payload(body) == 3
+
+
+def test_extract_bsr_from_bestseller_object_on_detail():
+    body = {
+        "request_info": {"success": True},
+        "result": {
+            "detail": {
+                "title": "Deodorant",
+                "bestseller": {"rank": 42, "context_name": "Handmade"},
+            }
+        },
+    }
+    product = parse_detail_payload("B09RKS585V", body)
+    assert product.bsr == 42
 
 
 def test_credit_budget_guard():

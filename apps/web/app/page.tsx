@@ -14,6 +14,7 @@ import {
   updateProductNotes,
 } from "@/lib/api";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
+import { formatBsr, formatPriceChange } from "@/lib/labels";
 
 function formatPrice(price: number | null, currency: string | null) {
   if (price == null) return "—";
@@ -25,17 +26,6 @@ function formatPrice(price: number | null, currency: string | null) {
   } catch {
     return `£${price.toFixed(2)}`;
   }
-}
-
-function formatDelta(absolute: number | null, percent: number | null) {
-  if (absolute == null) return { text: "Collecting…", className: "flat" };
-  const sign = absolute > 0 ? "+" : "";
-  const pct = percent == null ? "" : ` (${sign}${percent.toFixed(1)}%)`;
-  const className = absolute > 0 ? "up" : absolute < 0 ? "down" : "flat";
-  return {
-    text: `${sign}${absolute.toFixed(2)}${pct}`,
-    className,
-  };
 }
 
 function formatWhen(value: string | null) {
@@ -454,7 +444,7 @@ export default function HomePage() {
           <>
             <ul className="product-cards">
               {data.products.map((product) => {
-                const delta = formatDelta(
+                const delta = formatPriceChange(
                   product.price_change_absolute,
                   product.price_change_percent,
                 );
@@ -471,7 +461,7 @@ export default function HomePage() {
                         <dd>{formatPrice(product.price, product.currency)}</dd>
                       </div>
                       <div>
-                        <dt>7-day change</dt>
+                        <dt>7-day price change</dt>
                         <dd className={delta.className}>{delta.text}</dd>
                       </div>
                       <div>
@@ -484,11 +474,7 @@ export default function HomePage() {
                       </div>
                       <div>
                         <dt>Best Sellers Rank</dt>
-                        <dd>
-                          {product.bsr != null
-                            ? product.bsr.toLocaleString("en-GB")
-                            : "—"}
-                        </dd>
+                        <dd>{formatBsr(product.bsr)}</dd>
                       </div>
                     </dl>
                     <ProductActions
@@ -509,7 +495,7 @@ export default function HomePage() {
                     <th>Rank</th>
                     <th>Product</th>
                     <th>Price</th>
-                    <th>7-day change</th>
+                    <th>7-day price change</th>
                     <th>Est. weekly units</th>
                     <th>Best Sellers Rank</th>
                     <th>Actions</th>
@@ -517,7 +503,7 @@ export default function HomePage() {
                 </thead>
                 <tbody>
                   {data.products.map((product) => {
-                    const delta = formatDelta(
+                    const delta = formatPriceChange(
                       product.price_change_absolute,
                       product.price_change_percent,
                     );
@@ -535,11 +521,7 @@ export default function HomePage() {
                             ? `~${product.estimated_weekly_units}`
                             : "—"}
                         </td>
-                        <td>
-                          {product.bsr != null
-                            ? product.bsr.toLocaleString("en-GB")
-                            : "—"}
-                        </td>
+                        <td>{formatBsr(product.bsr)}</td>
                         <td>
                           <ProductActions
                             product={product}

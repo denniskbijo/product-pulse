@@ -97,13 +97,26 @@ def _unwrap_product(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_bsr(payload: dict[str, Any]) -> int | None:
-    ranks = payload.get("bestsellers_rank") or payload.get("bestSellersRank")
+    ranks = (
+        payload.get("bestsellers_rank")
+        or payload.get("bestSellersRank")
+        or payload.get("best_seller_rank")
+        or payload.get("bestSellerRank")
+    )
     if isinstance(ranks, list) and ranks:
         # Prefer root category rank (usually first).
         first = ranks[0]
         if isinstance(first, dict):
             return _as_int(first.get("rank") or first.get("value"))
         return _as_int(first)
+    if isinstance(ranks, dict):
+        return _as_int(ranks.get("rank") or ranks.get("value"))
+
+    bestseller = payload.get("bestseller")
+    if isinstance(bestseller, dict):
+        rank = _as_int(bestseller.get("rank") or bestseller.get("value"))
+        if rank is not None:
+            return rank
 
     flat = payload.get("bestsellers_rank_flat")
     if isinstance(flat, str):
@@ -111,6 +124,17 @@ def _extract_bsr(payload: dict[str, Any]) -> int | None:
         if match:
             return _as_int(match.group(1))
     return None
+
+
+def parse_bestsellers_rank_payload(body: dict[str, Any]) -> int | None:
+    """Parse Easyparser BEST_SELLERS_RANK operation response."""
+    result = body.get("result")
+    if not isinstance(result, dict):
+        return None
+    product = result.get("product")
+    if isinstance(product, dict):
+        return _extract_bsr(product)
+    return _extract_bsr(result)
 
 
 def _extract_monthly_sold(payload: dict[str, Any]) -> int | None:
@@ -416,6 +440,22 @@ class EasyparserClient:
         ]
         return entries, credit_used
 
+    def get_bestsellers_rank(self, asin: str) -> tuple[int | None, int]:
+        """Fetch BSR via BEST_SELLERS_RANK (1 credit). Returns (rank, credits_used)."""
+        self.ensure_budget(1)
+        body = self._request(
+            {
+                "api_key": self.settings.easyparser_api_key,
+                "platform": "AMZ",
+                "operation": "BEST_SELLERS_RANK",
+                "domain": self.settings.amazon_domain,
+                "asin": asin,
+                "output": "json",
+            }
+        )
+        used = self._track_credits(body, default_used=1)
+        return parse_bestsellers_rank_payload(body), used
+
     def get_detail(self, asin: str) -> EnrichedProduct:
         self.ensure_budget(1)
         body = self._request(
@@ -430,6 +470,17 @@ class EasyparserClient:
         )
         enriched = parse_detail_payload(asin, body)
         used = self._track_credits(body, default_used=enriched.credit_used or 1)
+
+        # DETAIL often omits UK BSR; fill from dedicated operation when needed.
+        if enriched.bsr is None and self.remaining_budget() >= 1:
+            try:
+                rank, rank_used = self.get_bestsellers_rank(asin)
+                used += rank_used
+                if rank is not None:
+                    enriched.bsr = rank
+            except EasyparserRequestError:
+                pass
+
         enriched.credit_used = used
         if self.last_credits_remaining is not None:
             enriched.credits_remaining = self.last_credits_remaining
