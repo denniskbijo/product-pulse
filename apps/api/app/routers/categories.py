@@ -41,6 +41,12 @@ def category_top(
 @router.post("/{category_id}/sync", response_model=SyncTriggerOut)
 def trigger_sync(
     category_id: str,
+    top_n: int | None = Query(
+        default=None,
+        ge=1,
+        le=50,
+        description="How many bestsellers to enrich. Use 1 to spend a single Easyparser DETAIL credit.",
+    ),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> SyncTriggerOut:
@@ -48,25 +54,19 @@ def trigger_sync(
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    try:
-        sync_run = run_category_sync(db, category, settings=settings)
-    except Exception as exc:  # noqa: BLE001
-        # Failed runs are persisted; surface a useful error.
-        status = build_sync_status(db, category.id, settings)
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": str(exc),
-                "sync": status.model_dump(mode="json"),
-            },
-        ) from exc
-
+    count = top_n if top_n is not None else settings.sync_top_n
+    sync_run = run_category_sync(db, category, settings=settings, top_n=count)
     credits = build_sync_status(db, category.id, settings).credits
-    message = {
-        "success": "Sync completed",
-        "budget_exceeded": "Stopped early: monthly Easyparser credit budget exhausted",
-        "failed": sync_run.error_message or "Sync failed",
-    }.get(sync_run.status, sync_run.status)
+
+    if sync_run.status == "success":
+        message = (
+            f"Synced {sync_run.products_synced} product(s); "
+            f"used {sync_run.credits_used} Easyparser credit(s)"
+        )
+    elif sync_run.status == "budget_exceeded":
+        message = sync_run.error_message or "Monthly Easyparser credit budget exhausted"
+    else:
+        message = sync_run.error_message or "Sync failed"
 
     return SyncTriggerOut(
         status=sync_run.status,

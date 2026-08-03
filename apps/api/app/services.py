@@ -51,7 +51,7 @@ def get_category_top(
             ProductSnapshot.category_id == category.id,
             ProductSnapshot.week_start == week_start,
         )
-        .order_by(ProductSnapshot.rank.asc())
+        .order_by(ProductSnapshot.rank.asc(), ProductSnapshot.id.desc())
         .limit(settings.sync_top_n)
     ).all()
 

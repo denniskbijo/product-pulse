@@ -107,6 +107,12 @@ select {
   transition: transform 160ms ease, filter 160ms ease;
 }
 
+.button.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
 .button:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.05);

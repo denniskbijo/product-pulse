@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -14,6 +15,10 @@ from app.seed import seed_categories
 from app.sync import run_category_sync
 
 scheduler = BackgroundScheduler()
+
+
+def _running_on_serverless() -> bool:
+    return bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
 
 def _weekly_sync_job() -> None:
@@ -42,7 +47,8 @@ async def lifespan(_: FastAPI):
     finally:
         db.close()
 
-    if not scheduler.running:
+    # APScheduler is for local/long-running hosts only (not Vercel serverless).
+    if not _running_on_serverless() and not scheduler.running:
         scheduler.add_job(
             _weekly_sync_job,
             CronTrigger(day_of_week="mon", hour=6, minute=0),
@@ -59,10 +65,18 @@ settings = get_settings()
 app = FastAPI(title="Amazon Pulse API", version="0.1.0", lifespan=lifespan)
 
 origins = [o.strip() for o in settings.api_cors_origins.split(",") if o.strip()]
+# Allow Vercel preview/production frontends when CORS is left open via *.
+if "*" in origins:
+    cors_origins = ["*"]
+    allow_credentials = False
+else:
+    cors_origins = origins or ["http://localhost:3000"]
+    allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or ["http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

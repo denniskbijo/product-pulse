@@ -14,3 +14,13 @@ build/
 *.egg-info/
 .DS_Store
 pgdata/
+.vercel/
+apps/*/.vercel/
+apps/*/.env.local
+package-lock.json
+
+
+.vercel
+node_modules/
+apps/*/.vercel/
+apps/*/.env.local

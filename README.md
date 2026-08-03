@@ -32,19 +32,41 @@ cp .env.example .env
 # docker compose up -d
 # then set DATABASE_URL=postgresql+psycopg://amazon_pulse:amazon_pulse@localhost:5432/amazon_pulse
 
-cd apps/api
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-
-# new terminal
-cd apps/web
-npm install
-npm run dev
+make install   # once
+make run       # API :8000 + web :3000
 ```
 
 Open http://localhost:3000
+
+Other targets: `make api`, `make web`, `make test`.
+
+## Deploy on Vercel
+
+Live deployments:
+
+| App | URL |
+|---|---|
+| **Web dashboard** | https://product-pulse-six.vercel.app |
+| **API** | https://product-pulse-api-kappa.vercel.app |
+
+This repo deploys as **two Vercel projects**:
+
+1. **API** (`apps/api`) — FastAPI serverless (London `lhr1`) + Neon Postgres  
+2. **Web** (`apps/web`) — Next.js dashboard (`NEXT_PUBLIC_API_URL` → API)
+
+### Redeploy
+
+```bash
+# API
+cd apps/api && npx vercel --prod --yes
+
+# Web
+cd apps/web && npx vercel --prod --yes
+```
+
+Required API env vars (already set in Vercel): `EASYPARSER_API_KEY`, `DATABASE_URL` (Neon `postgresql+psycopg://...`), `API_CORS_ORIGINS=*`.
+
+If Easyparser returns `error_code 5004`, their API is failing upstream (can happen from cloud or during provider outages). Retry later; local `make run` uses the same key.
 
 ## API
 
@@ -52,7 +74,7 @@ Open http://localhost:3000
 |---|---|---|
 | GET | `/categories` | Seeded UK categories |
 | GET | `/categories/{id\|slug}/top?window=7d` | Top 10 + sync/credit status |
-| POST | `/categories/{id\|slug}/sync` | Run discover → enrich → snapshot now |
+| POST | `/categories/{id\|slug}/sync` | Run discover → enrich → snapshot (`?top_n=1` spends 1 credit) |
 | GET | `/health` | Health check |
 
 ## Credit budget

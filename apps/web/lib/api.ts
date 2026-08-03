@@ -50,6 +50,23 @@ export type CategoryTop = {
   };
 };
 
+function formatApiError(text: string, status: number): string {
+  try {
+    const data = JSON.parse(text) as {
+      detail?: string | { message?: string };
+      message?: string;
+    };
+    if (typeof data.detail === "string") return data.detail;
+    if (data.detail && typeof data.detail === "object" && data.detail.message) {
+      return data.detail.message;
+    }
+    if (data.message) return data.message;
+  } catch {
+    // fall through
+  }
+  return text || `Request failed: ${status}`;
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -61,7 +78,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Request failed: ${response.status}`);
+    throw new Error(formatApiError(text, response.status));
   }
   return response.json() as Promise<T>;
 }
@@ -74,13 +91,18 @@ export function getCategoryTop(idOrSlug: string | number) {
   return apiFetch<CategoryTop>(`/categories/${idOrSlug}/top?window=7d`);
 }
 
-export function triggerSync(idOrSlug: string | number) {
-  return apiFetch<{
-    status: string;
-    message: string;
-    week_start: string;
-    products_synced: number;
-    credits_used: number;
-    credits_remaining_budget: number | null;
-  }>(`/categories/${idOrSlug}/sync`, { method: "POST" });
+export type SyncResult = {
+  status: string;
+  message: string;
+  week_start: string;
+  products_synced: number;
+  credits_used: number;
+  credits_remaining_budget: number | null;
+};
+
+export function triggerSync(idOrSlug: string | number, topN?: number) {
+  const query = topN != null ? `?top_n=${topN}` : "";
+  return apiFetch<SyncResult>(`/categories/${idOrSlug}/sync${query}`, {
+    method: "POST",
+  });
 }

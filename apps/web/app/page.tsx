@@ -46,7 +46,8 @@ export default function HomePage() {
   const [data, setData] = useState<CategoryTop | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [syncing, setSyncing] = useState(false);
+  const [syncing, setSyncing] = useState<"full" | "one" | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const load = (slug: string) => {
     startTransition(async () => {
@@ -82,16 +83,21 @@ export default function HomePage() {
     return `${credits.credits_remaining_budget} / ${credits.monthly_budget} budget left (${credits.month_key})`;
   }, [credits]);
 
-  const onSync = async () => {
-    setSyncing(true);
+  const onSync = async (topN?: number) => {
+    setSyncing(topN === 1 ? "one" : "full");
     setError(null);
+    setSyncMessage(null);
     try {
-      await triggerSync(selected);
+      const result = await triggerSync(selected, topN);
+      setSyncMessage(result.message);
+      if (result.status !== "success") {
+        setError(result.message);
+      }
       await load(selected);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sync failed");
     } finally {
-      setSyncing(false);
+      setSyncing(null);
     }
   };
 
@@ -123,8 +129,20 @@ export default function HomePage() {
               ))}
             </select>
           </div>
-          <button className="button" onClick={onSync} disabled={syncing || pending}>
-            {syncing ? "Syncing…" : "Sync now"}
+          <button
+            className="button secondary"
+            onClick={() => onSync(1)}
+            disabled={syncing != null || pending}
+            title="Enrich the #1 bestseller. Usually 1 Easyparser credit; 2 if Amazon HTML is blocked and SEARCH fallback is needed."
+          >
+            {syncing === "one" ? "Testing…" : "Test 1 product"}
+          </button>
+          <button
+            className="button"
+            onClick={() => onSync()}
+            disabled={syncing != null || pending}
+          >
+            {syncing === "full" ? "Syncing…" : "Sync top 10"}
           </button>
         </div>
       </section>
@@ -140,6 +158,7 @@ export default function HomePage() {
             ? ` · provider reports ${credits.credits_remaining_reported} remaining`
             : ""}
         </div>
+        {syncMessage ? <p className="note">{syncMessage}</p> : null}
         {data?.note ? <p className="note">{data.note}</p> : null}
         {data?.sync.last_error ? (
           <p className="error">Last sync error: {data.sync.last_error}</p>

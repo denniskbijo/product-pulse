@@ -9,8 +9,34 @@ from app.config import Settings, get_settings
 from app.credits import credit_status, get_or_create_ledger, record_credit_usage
 from app.math_estimates import estimate_weekly_units, week_start_for
 from app.models import Category, Product, ProductSnapshot, SyncRun
-from app.providers.discovery.bestsellers_html import fetch_bestsellers
+from app.providers.discovery.bestsellers_html import BestsellerEntry, fetch_bestsellers
 from app.providers.enrichment.easyparser import CreditBudgetExceeded, EasyparserClient
+
+
+def discover_bestsellers(
+    category: Category,
+    client: EasyparserClient,
+    *,
+    top_n: int,
+) -> tuple[list[BestsellerEntry], int, str]:
+    """Try free Amazon HTML, then Easyparser SEARCH keyword (1 credit)."""
+    try:
+        entries = fetch_bestsellers(category.bestsellers_url, top_n=top_n)
+    except Exception:  # noqa: BLE001
+        entries = []
+
+    if entries:
+        return entries, 0, "amazon_html"
+
+    # Bestsellers URL search is flaky on Easyparser; keyword search is reliable.
+    keyword = category.name.split("&")[0].strip() or category.slug.replace("-", " ")
+    entries, credit_used = client.search_products(keyword=keyword, top_n=top_n)
+    if not entries:
+        raise RuntimeError(
+            f"Could not discover products via Amazon HTML or Easyparser SEARCH "
+            f"(keyword={keyword!r})."
+        )
+    return entries, credit_used, "easyparser_search"
 
 
 def run_category_sync(
@@ -40,12 +66,36 @@ def run_category_sync(
     synced = 0
 
     try:
-        client.ensure_budget(top_n)
-        entries = fetch_bestsellers(category.bestsellers_url, top_n=top_n)
-        if not entries:
+        if not settings.easyparser_api_key.strip():
             raise RuntimeError(
-                f"No ASINs found on bestsellers page: {category.bestsellers_url}"
+                "EASYPARSER_API_KEY is empty. Save it in the project root .env and restart make run."
             )
+
+        client.ensure_budget(1)
+        entries, discovery_credits, _source = discover_bestsellers(
+            category, client, top_n=top_n
+        )
+        credits_this_run += discovery_credits
+        if discovery_credits:
+            record_credit_usage(
+                db,
+                used=discovery_credits,
+                remaining_reported=client.last_credits_remaining,
+                settings=settings,
+            )
+
+        client.ensure_budget(len(entries))
+
+        # Replace this week's category snapshot set so ranks stay unique.
+        old_rows = db.scalars(
+            select(ProductSnapshot).where(
+                ProductSnapshot.category_id == category.id,
+                ProductSnapshot.week_start == week_start,
+            )
+        ).all()
+        for row in old_rows:
+            db.delete(row)
+        db.flush()
 
         for entry in entries:
             enriched = client.get_detail(entry.asin)
@@ -126,7 +176,7 @@ def run_category_sync(
         sync_run.finished_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(sync_run)
-        raise
+        return sync_run
 
 
 def build_sync_status(db: Session, category_id: int | None, settings: Settings):
