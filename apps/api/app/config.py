@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     user_username: str = "basil"
     user_password: str = ""
 
+    # Vercel Cron / external schedulers: Authorization: Bearer <CRON_SECRET>
+    cron_secret: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

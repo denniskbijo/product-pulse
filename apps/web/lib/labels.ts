@@ -37,3 +37,12 @@ export function formatBsr(bsr: number | null | undefined): string {
   if (bsr == null) return "Unavailable";
   return bsr.toLocaleString("en-GB");
 }
+
+/** Amazon “bought in past month” is a lower-bound badge (N+ / NK+). */
+export function formatMonthlySold(value: number | null | undefined): string {
+  if (value == null || value <= 0) return "Unavailable";
+  if (value >= 1000 && value % 1000 === 0) {
+    return `${value / 1000}K+`;
+  }
+  return `${value.toLocaleString("en-GB")}+`;
+}

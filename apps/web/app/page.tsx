@@ -14,7 +14,7 @@ import {
   updateProductNotes,
 } from "@/lib/api";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
-import { formatBsr, formatPriceChange } from "@/lib/labels";
+import { formatBsr, formatMonthlySold, formatPriceChange } from "@/lib/labels";
 
 function formatPrice(price: number | null, currency: string | null) {
   if (price == null) return "—";
@@ -300,7 +300,7 @@ export default function HomePage() {
         <p className="lede">
           {isWatchlist
             ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it."
-            : "UK category top sellers — current price, estimated weekly volume, and 7-day price changes."}
+            : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
         </p>
         <div className="controls">
           <div className="field">
@@ -467,12 +467,8 @@ export default function HomePage() {
                         <dd className={delta.className}>{delta.text}</dd>
                       </div>
                       <div>
-                        <dt>Est. weekly units</dt>
-                        <dd>
-                          {product.estimated_weekly_units != null
-                            ? `~${product.estimated_weekly_units}`
-                            : "—"}
-                        </dd>
+                        <dt>Bought past month</dt>
+                        <dd>{formatMonthlySold(product.monthly_sold)}</dd>
                       </div>
                       <div>
                         <dt>Best Sellers Rank</dt>
@@ -498,7 +494,7 @@ export default function HomePage() {
                     <th>Product</th>
                     <th>Price</th>
                     <th>7-day price change</th>
-                    <th>Est. weekly units</th>
+                    <th>Bought past month</th>
                     <th>Best Sellers Rank</th>
                     <th>Actions</th>
                   </tr>
@@ -518,11 +514,7 @@ export default function HomePage() {
                         </td>
                         <td>{formatPrice(product.price, product.currency)}</td>
                         <td className={delta.className}>{delta.text}</td>
-                        <td>
-                          {product.estimated_weekly_units != null
-                            ? `~${product.estimated_weekly_units}`
-                            : "—"}
-                        </td>
+                        <td>{formatMonthlySold(product.monthly_sold)}</td>
                         <td>{formatBsr(product.bsr)}</td>
                         <td>
                           <ProductActions
@@ -543,10 +535,9 @@ export default function HomePage() {
       </section>
 
       <p className="footer">
-        Weekly unit figures are estimates — from Amazon’s “bought in past month”
-        when available, otherwise inferred from Best Sellers Rank. Prices update
-        from regular checks; 7-day change uses recent daily history when we have
-        it.
+        “Bought past month” is Amazon’s public badge (a lower bound like 5K+),
+        not an exact unit count. Prices update from daily checks; 7-day change
+        uses recent daily history when we have it.
       </p>
 
       {notesEditor ? (

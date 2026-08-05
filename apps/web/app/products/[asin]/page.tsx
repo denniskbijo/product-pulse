@@ -10,7 +10,7 @@ import {
 import { clearSession, loadSession } from "@/lib/auth";
 import {
   formatBsr,
-  formatEstimateSource,
+  formatMonthlySold,
   formatPriceChange,
   formatPriceHistorySource,
 } from "@/lib/labels";
@@ -124,8 +124,6 @@ export default function ProductDetailPage() {
     detail?.price_change_absolute ?? null,
     detail?.price_change_percent ?? null,
   );
-  const estimateSource = formatEstimateSource(detail?.sales_estimate_source);
-
   const onSaveNotes = async () => {
     if (!detail) return;
     setNotesSaving(true);
@@ -244,22 +242,10 @@ export default function ProductDetailPage() {
                 <dd>{formatBsr(detail.bsr)}</dd>
               </div>
               <div>
-                <dt>Est. weekly units</dt>
+                <dt>Bought past month</dt>
                 <dd>
-                  {detail.estimated_weekly_units != null
-                    ? `~${detail.estimated_weekly_units}`
-                    : "—"}
-                  {estimateSource ? (
-                    <span className="asin">{estimateSource}</span>
-                  ) : null}
-                </dd>
-              </div>
-              <div>
-                <dt>Monthly sold</dt>
-                <dd>
-                  {detail.monthly_sold != null
-                    ? detail.monthly_sold.toLocaleString("en-GB")
-                    : "—"}
+                  {formatMonthlySold(detail.monthly_sold)}
+                  <span className="asin">Amazon badge (lower bound)</span>
                 </dd>
               </div>
               <div>
