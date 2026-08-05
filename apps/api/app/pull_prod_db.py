@@ -17,6 +17,8 @@ from app.models import (  # noqa: F401 — register metadata
     Category,
     CreditLedger,
     DailyPricePoint,
+    HuntResult,
+    HuntRun,
     Product,
     ProductSnapshot,
     SyncRun,
@@ -31,6 +33,8 @@ TABLE_ORDER = [
     "daily_price_points",
     "sync_runs",
     "credit_ledger",
+    "hunt_runs",
+    "hunt_results",
 ]
 
 

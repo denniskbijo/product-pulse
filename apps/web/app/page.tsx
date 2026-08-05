@@ -291,6 +291,9 @@ export default function HomePage() {
         <div className="hero-top">
           <h1 className="brand">Amazon Pulse</h1>
           <div className="session-bar">
+            <a className="text-link" href="/hunt">
+              Winter Hunt
+            </a>
             <span className="note">{session.username}</span>
             <button className="button secondary compact" onClick={onLogout}>
               Log out

@@ -229,3 +229,74 @@ export function removeProductFromCategory(
     { method: "DELETE" },
   );
 }
+
+export type HuntProductType = {
+  slug: string;
+  name: string;
+  description: string;
+};
+
+export type HuntSeason = {
+  slug: string;
+  name: string;
+  blurb: string;
+  product_types: HuntProductType[];
+};
+
+export type HuntResult = {
+  search_position: number;
+  asin: string;
+  title: string | null;
+  image_url: string | null;
+  brand: string | null;
+  product_url: string | null;
+  price: number | null;
+  currency: string | null;
+  rating: number | null;
+  review_count: number | null;
+  monthly_sold: number | null;
+};
+
+export type HuntRunSummary = {
+  id: number;
+  season_slug: string;
+  product_type_slug: string;
+  product_type_name: string;
+  search_keyword: string;
+  top_n: number;
+  status: string;
+  credits_used: number;
+  result_count: number;
+  error_message: string | null;
+  created_by: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
+export type HuntRunDetail = HuntRunSummary & {
+  disclaimer: string;
+  results: HuntResult[];
+  credits_remaining_budget: number | null;
+};
+
+export function getHuntSeasons() {
+  return apiFetch<HuntSeason[]>("/hunt/seasons");
+}
+
+export function listHuntRuns() {
+  return apiFetch<HuntRunSummary[]>("/hunt/runs");
+}
+
+export function getHuntRun(runId: number) {
+  return apiFetch<HuntRunDetail>(`/hunt/runs/${runId}`);
+}
+
+export function createHuntRun(seasonSlug: string, productTypeSlug: string) {
+  return apiFetch<HuntRunDetail>("/hunt/runs", {
+    method: "POST",
+    body: JSON.stringify({
+      season_slug: seasonSlug,
+      product_type_slug: productTypeSlug,
+    }),
+  });
+}

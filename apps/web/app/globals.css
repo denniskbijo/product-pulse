@@ -352,6 +352,14 @@ select {
   gap: 0.85rem;
 }
 
+.hunt-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
 .product-card {
   padding: 1rem;
   border: 1px solid var(--line);

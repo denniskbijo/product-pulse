@@ -40,6 +40,23 @@ class EnrichedProduct:
     credits_remaining: int | None
 
 
+@dataclass
+class SearchHit:
+    """One organic SEARCH result (no DETAIL credit)."""
+
+    position: int
+    asin: str
+    title: str | None = None
+    image_url: str | None = None
+    brand: str | None = None
+    product_url: str | None = None
+    price: float | None = None
+    currency: str | None = None
+    rating: float | None = None
+    review_count: int | None = None
+    monthly_sold: int | None = None
+
+
 def _as_float(value: Any) -> float | None:
     if value is None:
         return None
@@ -269,8 +286,7 @@ def parse_detail_payload(asin: str, body: dict[str, Any]) -> EnrichedProduct:
     )
 
 
-def _extract_asins_from_search(body: dict[str, Any], *, top_n: int) -> list[str]:
-    candidates: list[Any] = []
+def _search_candidate_items(body: dict[str, Any]) -> list[Any]:
     result = body.get("result")
     if isinstance(result, dict):
         for key in (
@@ -283,45 +299,123 @@ def _extract_asins_from_search(body: dict[str, Any], *, top_n: int) -> list[str]
         ):
             value = result.get(key)
             if isinstance(value, list):
-                candidates = value
-                break
-    elif isinstance(result, list):
-        candidates = result
+                return value
+    if isinstance(result, list):
+        return result
+    return []
 
+
+def _asin_from_search_item(item: Any) -> str | None:
+    if isinstance(item, str):
+        match = ASIN_RE.search(item)
+        return match.group(1) if match else None
+    if not isinstance(item, dict):
+        return None
+    raw = item.get("asin") or item.get("ASIN")
+    if isinstance(raw, str) and re.fullmatch(r"[A-Z0-9]{10}", raw.upper()):
+        return raw.upper()
+    for field in ("url", "link", "productUrl", "product_url"):
+        value = item.get(field)
+        if isinstance(value, str):
+            match = DP_RE.search(value)
+            if match:
+                return match.group(1).upper()
+    return None
+
+
+def _extract_asins_from_search(body: dict[str, Any], *, top_n: int) -> list[str]:
     ordered: list[str] = []
     seen: set[str] = set()
-
-    def add(asin: str | None) -> None:
-        nonlocal ordered
-        if asin and asin not in seen and re.fullmatch(r"[A-Z0-9]{10}", asin):
+    for item in _search_candidate_items(body):
+        asin = _asin_from_search_item(item)
+        if asin and asin not in seen:
             seen.add(asin)
             ordered.append(asin)
-
-    for item in candidates:
-        if isinstance(item, dict):
-            raw = item.get("asin") or item.get("ASIN")
-            if isinstance(raw, str):
-                add(raw)
-            else:
-                for field in ("url", "link", "productUrl"):
-                    value = item.get(field)
-                    if isinstance(value, str):
-                        match = DP_RE.search(value)
-                        if match:
-                            add(match.group(1))
-                            break
-        elif isinstance(item, str):
-            match = ASIN_RE.search(item)
-            if match:
-                add(match.group(1))
         if len(ordered) >= top_n:
             return ordered
 
     for match in DP_RE.finditer(json.dumps(body, default=str)):
-        add(match.group(1))
+        asin = match.group(1).upper()
+        if asin not in seen:
+            seen.add(asin)
+            ordered.append(asin)
         if len(ordered) >= top_n:
             break
     return ordered[:top_n]
+
+
+def parse_search_hits(body: dict[str, Any], *, top_n: int) -> list[SearchHit]:
+    """Parse organic SEARCH results into rich hits (ASIN + listing fields when present)."""
+    hits: list[SearchHit] = []
+    seen: set[str] = set()
+    for item in _search_candidate_items(body):
+        asin = _asin_from_search_item(item)
+        if not asin or asin in seen:
+            continue
+        seen.add(asin)
+        if isinstance(item, dict):
+            price, currency = _extract_price(item)
+            rating = _as_float(_first_present(item, ["rating", "stars", "averageRating"]))
+            if rating is None and isinstance(item.get("rating"), dict):
+                rating = _as_float(
+                    item["rating"].get("value") or item["rating"].get("rating")
+                )
+            review_count = _as_int(
+                _first_present(
+                    item,
+                    [
+                        "reviews_total",
+                        "reviewCount",
+                        "reviewsCount",
+                        "ratingsTotal",
+                        "reviews",
+                    ],
+                )
+            )
+            title = _first_present(item, ["title", "name", "productTitle"])
+            brand = _first_present(item, ["brand", "brandName"])
+            product_url = _first_present(item, ["url", "link", "productUrl"])
+            if not product_url:
+                product_url = f"https://www.amazon.co.uk/dp/{asin}"
+            hits.append(
+                SearchHit(
+                    position=len(hits) + 1,
+                    asin=asin,
+                    title=str(title) if title else None,
+                    image_url=_extract_image(item),
+                    brand=str(brand) if brand else None,
+                    product_url=str(product_url) if product_url else None,
+                    price=price,
+                    currency=currency or ("GBP" if price is not None else None),
+                    rating=rating,
+                    review_count=review_count,
+                    monthly_sold=_extract_monthly_sold(item),
+                )
+            )
+        else:
+            hits.append(
+                SearchHit(
+                    position=len(hits) + 1,
+                    asin=asin,
+                    product_url=f"https://www.amazon.co.uk/dp/{asin}",
+                )
+            )
+        if len(hits) >= top_n:
+            return hits
+
+    # Fallback: ASIN-only scrape from raw JSON if structured list was empty/sparse.
+    if not hits:
+        for index, asin in enumerate(
+            _extract_asins_from_search(body, top_n=top_n), start=1
+        ):
+            hits.append(
+                SearchHit(
+                    position=index,
+                    asin=asin,
+                    product_url=f"https://www.amazon.co.uk/dp/{asin}",
+                )
+            )
+    return hits[:top_n]
 
 
 class EasyparserClient:
@@ -411,13 +505,12 @@ class EasyparserClient:
             self.last_credits_remaining = remaining
         return used
 
-    def search_products(
+    def _search_request(
         self,
         *,
         keyword: str | None = None,
         url: str | None = None,
-        top_n: int = 10,
-    ) -> tuple[list[BestsellerEntry], int]:
+    ) -> tuple[dict[str, Any], int]:
         self.ensure_budget(1)
         params: dict[str, Any] = {
             "api_key": self.settings.easyparser_api_key,
@@ -430,15 +523,34 @@ class EasyparserClient:
             params["url"] = url
         if keyword:
             params["keyword"] = keyword
-
         body = self._request(params)
         credit_used = self._track_credits(body, default_used=1)
+        return body, credit_used
+
+    def search_products(
+        self,
+        *,
+        keyword: str | None = None,
+        url: str | None = None,
+        top_n: int = 10,
+    ) -> tuple[list[BestsellerEntry], int]:
+        body, credit_used = self._search_request(keyword=keyword, url=url)
         asins = _extract_asins_from_search(body, top_n=top_n)
         entries = [
             BestsellerEntry(rank=index, asin=asin)
             for index, asin in enumerate(asins, start=1)
         ]
         return entries, credit_used
+
+    def search_catalog(
+        self,
+        *,
+        keyword: str,
+        top_n: int = 5,
+    ) -> tuple[list[SearchHit], int]:
+        """SEARCH for hunt MVP — 1 credit, up to top_n rich listing hits."""
+        body, credit_used = self._search_request(keyword=keyword)
+        return parse_search_hits(body, top_n=top_n), credit_used
 
     def get_bestsellers_rank(self, asin: str) -> tuple[int | None, int]:
         """Fetch BSR via BEST_SELLERS_RANK (1 credit). Returns (rank, credits_used)."""

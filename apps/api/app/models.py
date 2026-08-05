@@ -135,3 +135,51 @@ class CreditLedger(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class HuntRun(Base):
+    __tablename__ = "hunt_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    season_slug: Mapped[str] = mapped_column(String(64), index=True)
+    product_type_slug: Mapped[str] = mapped_column(String(64), index=True)
+    product_type_name: Mapped[str] = mapped_column(String(128))
+    search_keyword: Mapped[str] = mapped_column(String(255))
+    top_n: Mapped[int] = mapped_column(Integer, default=5)
+    status: Mapped[str] = mapped_column(String(32), default="running")
+    credits_used: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    results: Mapped[list["HuntResult"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class HuntResult(Base):
+    __tablename__ = "hunt_results"
+    __table_args__ = (
+        UniqueConstraint("run_id", "asin", name="uq_hunt_result_run_asin"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("hunt_runs.id"), index=True)
+    search_position: Mapped[int] = mapped_column(Integer)
+    asin: Mapped[str] = mapped_column(String(16), index=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    product_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    review_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    monthly_sold: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    run: Mapped[HuntRun] = relationship(back_populates="results")

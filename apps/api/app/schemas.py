@@ -137,3 +137,57 @@ class ProductDetailOut(BaseModel):
     updated_at: datetime | None = None
     categories: list[ProductCategorySightingOut] = Field(default_factory=list)
     price_history: list[PriceHistoryPointOut] = Field(default_factory=list)
+
+
+class HuntProductTypeOut(BaseModel):
+    slug: str
+    name: str
+    description: str
+
+
+class HuntSeasonOut(BaseModel):
+    slug: str
+    name: str
+    blurb: str
+    product_types: list[HuntProductTypeOut] = Field(default_factory=list)
+
+
+class HuntRunCreateIn(BaseModel):
+    season_slug: str = Field(min_length=1)
+    product_type_slug: str = Field(min_length=1)
+
+
+class HuntResultOut(BaseModel):
+    search_position: int
+    asin: str
+    title: str | None = None
+    image_url: str | None = None
+    brand: str | None = None
+    product_url: str | None = None
+    price: float | None = None
+    currency: str | None = None
+    rating: float | None = None
+    review_count: int | None = None
+    monthly_sold: int | None = None
+
+
+class HuntRunSummaryOut(BaseModel):
+    id: int
+    season_slug: str
+    product_type_slug: str
+    product_type_name: str
+    search_keyword: str
+    top_n: int
+    status: str
+    credits_used: int = 0
+    result_count: int = 0
+    error_message: str | None = None
+    created_by: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
+class HuntRunDetailOut(HuntRunSummaryOut):
+    disclaimer: str
+    results: list[HuntResultOut] = Field(default_factory=list)
+    credits_remaining_budget: int | None = None

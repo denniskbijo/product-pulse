@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{API_ROOT / 'amazon_pulse.db'}"
     monthly_credit_budget: int = 100
     sync_top_n: int = 10
+    # Winter Hunt SEARCH returns this many candidates (1 Easyparser credit).
+    hunt_top_n: int = 5
     # Daily Amazon mobile price scrape (local/cron). Hard cap to stay polite.
     daily_scrape_max: int = 10
     daily_scrape_delay_seconds: float = 1.5

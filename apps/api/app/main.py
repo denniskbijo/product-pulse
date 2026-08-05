@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.db import SessionLocal, init_db
 from app.models import Category
-from app.routers import auth, categories, cron, products
+from app.routers import auth, categories, cron, hunt, products
 from app.daily_prices import run_daily_price_scrape
 from app.seed import seed_categories
 from app.sync import run_category_sync
@@ -108,6 +108,7 @@ app.include_router(auth.router)
 app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(cron.router)
+app.include_router(hunt.router)
 
 
 @app.get("/health")
