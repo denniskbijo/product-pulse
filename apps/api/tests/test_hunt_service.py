@@ -18,7 +18,7 @@ def _seed_winter_hunt(db) -> None:
     db.add(
         Category(
             slug="winter-hunt",
-            name="Winter Hunt",
+            name="Seasonal Hunt",
             bestsellers_url="https://www.amazon.co.uk/",
         )
     )

@@ -11,7 +11,7 @@ SEED_CATEGORIES = [
     },
     {
         "slug": "winter-hunt",
-        "name": "Winter Hunt",
+        "name": "Seasonal Hunt",
         "bestsellers_url": "https://www.amazon.co.uk/",
     },
     {

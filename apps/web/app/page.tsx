@@ -299,7 +299,7 @@ export default function HomePage() {
           <h1 className="brand">Amazon Pulse</h1>
           <div className="session-bar">
             <a className="text-link" href="/hunt">
-              Winter Hunt
+              Seasonal Hunt
             </a>
             <span className="note">{session.username}</span>
             <button className="button secondary compact" onClick={onLogout}>
@@ -309,9 +309,11 @@ export default function HomePage() {
         </div>
         <p className="lede">
           {isWatchlist
-            ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it."
+            ? admin
+              ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it (uses Easyparser)."
+              : "Your custom watchlist. Admins can paste ASINs; you can add hunt candidates from Seasonal Hunt."
             : isWinterHunt
-              ? "Candidates saved from Winter Hunt — current UK demand signals, not December archives."
+              ? "Candidates saved from Seasonal Hunt — current UK demand signals, not historical archives."
               : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
         </p>
         <div className="controls">
@@ -333,7 +335,7 @@ export default function HomePage() {
               ))}
             </select>
           </div>
-          {isWatchlist ? (
+          {isWatchlist && admin ? (
             <>
               <div className="field field-watchlist">
                 <label htmlFor="watchlist-input">ASIN or Amazon UK URL</label>
@@ -393,18 +395,19 @@ export default function HomePage() {
         <section className="empty-cta">
           <h2>No watchlist products yet</h2>
           <p className="note">
-            Watchlist is your custom list. Paste an ASIN or Amazon UK URL above to
-            add one product at a time.
+            {admin
+              ? "Watchlist is your custom list. Paste an ASIN or Amazon UK URL above to add one product at a time."
+              : "Watchlist is a shared list. Ask an admin to paste an ASIN, or add candidates from Seasonal Hunt (no Easyparser credit)."}
           </p>
         </section>
       ) : null}
 
       {!hasProducts && isWinterHunt ? (
         <section className="empty-cta">
-          <h2>No Winter Hunt products yet</h2>
+          <h2>No Seasonal Hunt products yet</h2>
           <p className="note">
             Anyone signed in can run a hunt from{" "}
-            <a href="/hunt">Winter Hunt</a>; results auto-save here.
+            <a href="/hunt">Seasonal Hunt</a>; results auto-save here.
           </p>
         </section>
       ) : null}

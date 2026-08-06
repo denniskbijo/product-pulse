@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import AuthUser, get_current_user, require_admin
+from app.auth import AuthUser, get_current_user
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.hunt import (
@@ -13,7 +13,12 @@ from app.hunt import (
     promote_hunt_run_to_category,
     run_hunt,
 )
-from app.hunt_catalog import HUNT_TOP_N, list_seasons
+from app.hunt_catalog import (
+    HUNT_TOP_N,
+    calendar_season_slug,
+    default_hunt_season_slug,
+    list_seasons,
+)
 from app.oxylabs_credits import oxylabs_credit_status
 from app.providers.discovery.oxylabs import oxylabs_configured
 from app.schemas import (
@@ -124,9 +129,9 @@ def save_hunt_run_to_category(
     run_id: int,
     body: HuntPromoteIn | None = None,
     db: Session = Depends(get_db),
-    _: AuthUser = Depends(require_admin),
+    _: AuthUser = Depends(get_current_user),
 ) -> HuntPromoteOut:
-    """Manual re-publish (successful hunts already auto-save to Winter Hunt)."""
+    """Manual re-publish (successful hunts already auto-save to Seasonal Hunt)."""
     payload = body or HuntPromoteIn()
     try:
         return promote_hunt_run_to_category(
@@ -157,8 +162,10 @@ def hunt_meta(
         anyone_can_hunt=True,
         disclaimer=(
             "Current UK demand from Oxylabs Amazon search/bestsellers — not "
-            "historical December archives or multi-year winter sales."
+            "historical seasonal archives or multi-year sales history."
         ),
         category_slug=HUNT_CATEGORY_SLUG,
+        calendar_season_slug=calendar_season_slug(),
+        default_season_slug=default_hunt_season_slug(),
         oxylabs_credits=OxylabsCreditsOut(**credits),
     )

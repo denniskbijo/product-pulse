@@ -70,10 +70,12 @@ export default function HuntPage() {
         setSeasons(seasonList);
         setRuns(runList);
         setMeta(huntMeta);
-        const winter = seasonList.find((s) => s.slug === "winter") || seasonList[0];
-        if (winter) {
-          setSeasonSlug(winter.slug);
-          setTypeSlug(winter.product_types[0]?.slug || "");
+        const preferred =
+          seasonList.find((s) => s.slug === huntMeta.default_season_slug) ||
+          seasonList[0];
+        if (preferred) {
+          setSeasonSlug(preferred.slug);
+          setTypeSlug(preferred.product_types[0]?.slug || "");
         }
         if (runList[0]) {
           return getHuntRun(runList[0].id).then(setActiveRun);
@@ -86,7 +88,7 @@ export default function HuntPage() {
   }, [ready, session?.accessToken]);
 
   const onRun = async () => {
-    if (!admin || !typeSlug) return;
+    if (!typeSlug) return;
     setRunning(true);
     setError(null);
     setMessage(null);
@@ -120,7 +122,7 @@ export default function HuntPage() {
         if (detail.category_saved) {
           parts.push(
             detail.category_message ||
-              "saved to Winter Hunt category for everyone",
+              "saved to Seasonal Hunt category for everyone",
           );
         }
         setMessage(parts.join(" · "));
@@ -149,7 +151,7 @@ export default function HuntPage() {
   };
 
   const onSaveToCategory = async () => {
-    if (!admin || !activeRun || activeRun.status !== "success") return;
+    if (!activeRun || activeRun.status !== "success") return;
     setSavingCategory(true);
     setError(null);
     setMessage(null);
@@ -209,7 +211,7 @@ export default function HuntPage() {
     <main className="shell">
       <section className="hero">
         <div className="hero-top">
-          <h1 className="brand">Winter Hunt</h1>
+          <h1 className="brand">Seasonal Hunt</h1>
           <div className="session-bar">
             <a className="text-link" href="/">
               ← Dashboard
@@ -227,9 +229,9 @@ export default function HuntPage() {
           </div>
         </div>
         <p className="lede">
-          Pick a product type and run a hunt — results auto-save to the Winter
-          Hunt category for everyone signed in. Current UK demand only — not
-          last December’s archive.
+          Default season is chosen for timely procurement (e.g. in summer we
+          hunt winter). Results auto-save to the Seasonal Hunt category for
+          everyone signed in. Current UK demand only — not historical archives.
         </p>
       </section>
 
@@ -281,6 +283,14 @@ export default function HuntPage() {
             {running ? "Searching…" : "Run hunt"}
           </button>
         </div>
+        {meta?.default_season_slug && meta?.calendar_season_slug ? (
+          <p className="note">
+            Calendar season: <strong>{meta.calendar_season_slug}</strong>
+            {" · "}
+            Default hunt: <strong>{meta.default_season_slug}</strong> (procure
+            ahead)
+          </p>
+        ) : null}
         {season ? <p className="note">{season.blurb}</p> : null}
         {productTypes.find((p) => p.slug === typeSlug)?.description ? (
           <p className="note">
@@ -303,7 +313,7 @@ export default function HuntPage() {
         {meta ? (
           <p className="note">
             Cost: <strong>1 Oxylabs request</strong> per hunt. Results auto-save
-            to the Winter Hunt category
+            to the Seasonal Hunt category
             {meta.oxylabs_configured
               ? "."
               : " — Oxylabs credentials are not configured yet."}
@@ -355,19 +365,17 @@ export default function HuntPage() {
               activeRun.results.length > 0 ? (
                 <div className="product-actions" style={{ marginTop: "0.75rem" }}>
                   <a className="button compact" href="/?category=winter-hunt">
-                    Open Winter Hunt category
+                    Open Seasonal Hunt category
                   </a>
-                  {admin ? (
-                    <button
-                      type="button"
-                      className="button secondary compact"
-                      disabled={savingCategory}
-                      onClick={() => void onSaveToCategory()}
-                      title="Successful hunts already auto-save; use this to refresh ranks"
-                    >
-                      {savingCategory ? "Refreshing…" : "Refresh category"}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="button secondary compact"
+                    disabled={savingCategory}
+                    onClick={() => void onSaveToCategory()}
+                    title="Successful hunts already auto-save; use this to refresh ranks"
+                  >
+                    {savingCategory ? "Refreshing…" : "Refresh category"}
+                  </button>
                 </div>
               ) : null}
               {activeRun.category_message ? (
@@ -451,10 +459,10 @@ export default function HuntPage() {
       </section>
 
       <p className="footer">
-        Hunt uses 1 Oxylabs request per run. Saving to Winter Hunt and Add to
+        Hunt uses 1 Oxylabs request per run. Saving to Seasonal Hunt and Add to
         Watchlist from hunt results use that data only — 0 extra credits.
-        Pasting a new ASIN on the dashboard Watchlist still uses 1 Easyparser
-        DETAIL credit.
+        Pasting a new ASIN on the dashboard Watchlist is admin-only and uses 1
+        Easyparser DETAIL credit.
       </p>
     </main>
   );

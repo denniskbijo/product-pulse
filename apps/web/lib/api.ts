@@ -302,6 +302,8 @@ export type HuntMeta = {
   anyone_can_hunt: boolean;
   disclaimer: string;
   category_slug: string;
+  calendar_season_slug: string;
+  default_season_slug: string;
   oxylabs_credits: OxylabsCredits | null;
 };
 

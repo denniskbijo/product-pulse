@@ -84,7 +84,7 @@ def run_hunt(
     if not oxylabs_configured(settings):
         run.status = "failed"
         run.error_message = (
-            "Winter Hunt requires Oxylabs. Set OXYLABS_USERNAME and "
+            "Seasonal Hunt requires Oxylabs. Set OXYLABS_USERNAME and "
             "OXYLABS_PASSWORD (no Easyparser fallback)."
         )
         run.finished_at = datetime.now(timezone.utc)

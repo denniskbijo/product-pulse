@@ -58,7 +58,7 @@ def add_watchlist_product(
     body: WatchlistProductAddIn,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    _: AuthUser = Depends(get_current_user),
+    _: AuthUser = Depends(require_admin),
 ) -> WatchlistProductAddOut:
     try:
         return add_product_to_watchlist(db, raw_input=body.input, settings=settings)

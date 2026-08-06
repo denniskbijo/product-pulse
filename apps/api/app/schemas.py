@@ -216,6 +216,8 @@ class HuntMetaOut(BaseModel):
     anyone_can_hunt: bool = True
     disclaimer: str
     category_slug: str = "winter-hunt"
+    calendar_season_slug: str
+    default_season_slug: str
     oxylabs_credits: OxylabsCreditsOut | None = None
 
 
