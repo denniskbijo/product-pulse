@@ -346,7 +346,7 @@ export function createHuntRun(seasonSlug: string, productTypeSlug: string) {
 
 export function saveHuntRunToCategory(
   runId: number,
-  categorySlug = "winter-hunt",
+  categorySlug = "seasonal-hunt",
 ) {
   return apiFetch<HuntPromoteResult>(`/hunt/runs/${runId}/save-to-category`, {
     method: "POST",

@@ -14,10 +14,10 @@ def _session():
     return sessionmaker(bind=engine)()
 
 
-def _seed_winter_hunt(db) -> None:
+def _seed_seasonal_hunt(db) -> None:
     db.add(
         Category(
-            slug="winter-hunt",
+            slug="seasonal-hunt",
             name="Seasonal Hunt",
             bestsellers_url="https://www.amazon.co.uk/",
         )
@@ -25,9 +25,14 @@ def _seed_winter_hunt(db) -> None:
     db.commit()
 
 
+def _patch_oxylabs(monkeypatch, fake_cls):
+    monkeypatch.setattr("app.hunt.OxylabsClient", fake_cls)
+    monkeypatch.setattr("app.oxylabs_credits.OxylabsClient", fake_cls)
+
+
 def test_run_hunt_requires_oxylabs():
     db = _session()
-    _seed_winter_hunt(db)
+    _seed_seasonal_hunt(db)
     settings = Settings(oxylabs_username="", oxylabs_password="", jwt_secret="x")
     detail = run_hunt(
         db,
@@ -42,7 +47,7 @@ def test_run_hunt_requires_oxylabs():
 
 def test_run_hunt_oxylabs_autosaves_category(monkeypatch):
     db = _session()
-    _seed_winter_hunt(db)
+    _seed_seasonal_hunt(db)
     settings = Settings(
         oxylabs_username="user",
         oxylabs_password="pass",
@@ -60,11 +65,14 @@ def test_run_hunt_oxylabs_autosaves_category(monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
+        def fetch_month_results_used(self, *, month_key: str):
+            return None
+
         def hunt_catalog(self, *, keyword: str, top_n: int = 5, browse_node=None):
             assert keyword == "electric blanket"
             return hits[:top_n], 1, "amazon_search"
 
-    monkeypatch.setattr("app.hunt.OxylabsClient", FakeOxylabs)
+    _patch_oxylabs(monkeypatch, FakeOxylabs)
 
     detail = run_hunt(
         db,
@@ -77,7 +85,7 @@ def test_run_hunt_oxylabs_autosaves_category(monkeypatch):
     assert detail.provider == "oxylabs:amazon_search"
     assert detail.credits_used == 1
     assert detail.category_saved is True
-    assert detail.category_slug == "winter-hunt"
+    assert detail.category_slug == "seasonal-hunt"
     assert len(detail.results) == 3
     assert detail.results[0].asin == "B0HIGH0002"
 
@@ -110,7 +118,7 @@ def test_add_hunt_result_to_watchlist(monkeypatch):
     from app.models import Category, ProductSnapshot
 
     db = _session()
-    _seed_winter_hunt(db)
+    _seed_seasonal_hunt(db)
     db.add(
         Category(
             slug="watchlist",
@@ -140,10 +148,13 @@ def test_add_hunt_result_to_watchlist(monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
+        def fetch_month_results_used(self, *, month_key: str):
+            return None
+
         def hunt_catalog(self, *, keyword: str, top_n: int = 5, browse_node=None):
             return hits[:top_n], 1, "amazon_search"
 
-    monkeypatch.setattr("app.hunt.OxylabsClient", FakeOxylabs)
+    _patch_oxylabs(monkeypatch, FakeOxylabs)
     detail = run_hunt(
         db,
         season_slug="winter",
@@ -164,7 +175,7 @@ def test_add_hunt_result_to_watchlist(monkeypatch):
 
 def test_promote_hunt_run_to_category(monkeypatch):
     db = _session()
-    _seed_winter_hunt(db)
+    _seed_seasonal_hunt(db)
 
     settings = Settings(
         oxylabs_username="user",
@@ -181,10 +192,13 @@ def test_promote_hunt_run_to_category(monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
+        def fetch_month_results_used(self, *, month_key: str):
+            return None
+
         def hunt_catalog(self, *, keyword: str, top_n: int = 5, browse_node=None):
             return hits[:top_n], 1, "amazon_search"
 
-    monkeypatch.setattr("app.hunt.OxylabsClient", FakeOxylabs)
+    _patch_oxylabs(monkeypatch, FakeOxylabs)
     detail = run_hunt(
         db,
         season_slug="winter",
@@ -196,4 +210,4 @@ def test_promote_hunt_run_to_category(monkeypatch):
     result = promote_hunt_run_to_category(db, run_id=detail.id)
     assert result.status == "success"
     assert result.products_updated == 2
-    assert result.category_slug == "winter-hunt"
+    assert result.category_slug == "seasonal-hunt"

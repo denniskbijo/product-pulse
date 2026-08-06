@@ -215,14 +215,14 @@ class HuntMetaOut(BaseModel):
     auto_saves_to_category: bool = True
     anyone_can_hunt: bool = True
     disclaimer: str
-    category_slug: str = "winter-hunt"
+    category_slug: str = "seasonal-hunt"
     calendar_season_slug: str
     default_season_slug: str
     oxylabs_credits: OxylabsCreditsOut | None = None
 
 
 class HuntPromoteIn(BaseModel):
-    category_slug: str = "winter-hunt"
+    category_slug: str = "seasonal-hunt"
 
 
 class HuntPromoteOut(BaseModel):

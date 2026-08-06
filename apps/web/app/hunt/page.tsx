@@ -158,7 +158,7 @@ export default function HuntPage() {
     try {
       const result = await saveHuntRunToCategory(
         activeRun.id,
-        meta?.category_slug || "winter-hunt",
+        meta?.category_slug || "seasonal-hunt",
       );
       setActiveRun((prev) =>
         prev
@@ -364,7 +364,7 @@ export default function HuntPage() {
               {activeRun.status === "success" &&
               activeRun.results.length > 0 ? (
                 <div className="product-actions" style={{ marginTop: "0.75rem" }}>
-                  <a className="button compact" href="/?category=winter-hunt">
+                  <a className="button compact" href="/?category=seasonal-hunt">
                     Open Seasonal Hunt category
                   </a>
                   <button

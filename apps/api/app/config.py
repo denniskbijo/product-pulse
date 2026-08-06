@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{API_ROOT / 'amazon_pulse.db'}"
     monthly_credit_budget: int = 100
     sync_top_n: int = 10
-    # Winter Hunt candidates per run (Oxylabs only — no Easyparser fallback).
+    # Seasonal Hunt candidates per run (Oxylabs only — no Easyparser fallback).
     hunt_top_n: int = 5
     # Oxylabs Web Scraper API (required for Hunt).
     # https://developers.oxylabs.io/products/web-scraper-api
@@ -36,25 +36,29 @@ class Settings(BaseSettings):
     oxylabs_base_url: str = "https://realtime.oxylabs.io/v1/queries"
     # Usage stats API (remaining balance when /stats/limits is unavailable).
     oxylabs_stats_url: str = "https://data.oxylabs.io/v2/stats"
-    # Soft budget for UI + hunt gating (trial/plan allotment). Default 1000.
+    # Hard monthly budget for hunt gating (reserved before each Oxylabs call).
     oxylabs_monthly_credit_budget: int = 1000
     # Amazon marketplace TLD for Oxylabs (co.uk, com, de, …).
     oxylabs_amazon_domain: str = "co.uk"
     # Daily Amazon mobile price scrape (local/cron). Hard cap to stay polite.
     daily_scrape_max: int = 10
     daily_scrape_delay_seconds: float = 1.5
-    # Comma-separated. Use "*" for public demos / Vercel frontends.
+    # Comma-separated allowlist. Do NOT use "*".
+    # Example prod: https://product-pulse-six.vercel.app,http://localhost:3000
     api_cors_origins: str = "http://localhost:3000"
     easyparser_base_url: str = "https://realtime.easyparser.com/v1/request"
     amazon_domain: str = ".co.uk"
     amazon_marketplace_host: str = "www.amazon.co.uk"
 
-    # Auth (env-configured accounts; passwords compared as plain secrets)
+    # Auth (bcrypt password hashes — generate with: python -c "from app.passwords import hash_password; print(hash_password('...'))")
     jwt_secret: str = ""
     jwt_expire_hours: int = 72
     admin_username: str = "admin"
-    admin_password: str = ""
+    admin_password_hash: str = ""
     user_username: str = "basil"
+    user_password_hash: str = ""
+    # Legacy plaintext fields ignored for auth (kept so old env files don't crash Settings).
+    admin_password: str = ""
     user_password: str = ""
 
     # Vercel Cron / external schedulers: Authorization: Bearer <CRON_SECRET>

@@ -66,7 +66,7 @@ def test_seed_merges_when_both_featured_and_watchlist_exist():
     cats = list(db.scalars(select(Category)).all())
     assert {c.slug for c in cats} == {
         "watchlist",
-        "winter-hunt",
+        "seasonal-hunt",
         "home-kitchen",
         "electronics",
         "beauty",
@@ -91,3 +91,41 @@ def test_seed_is_idempotent_after_rename():
     assert (
         len(list(db.scalars(select(Category).where(Category.slug == "watchlist")))) == 1
     )
+
+
+def test_seed_renames_winter_hunt_to_seasonal_hunt():
+    db = _session()
+    db.add(
+        Category(
+            slug="winter-hunt",
+            name="Winter Hunt",
+            bestsellers_url="https://www.amazon.co.uk/",
+        )
+    )
+    db.add(Product(asin="B0HUNT00001", title="Hunt item"))
+    db.flush()
+    db.add(
+        ProductSnapshot(
+            category_id=db.scalar(
+                select(Category).where(Category.slug == "winter-hunt")
+            ).id,
+            asin="B0HUNT00001",
+            week_start=date(2026, 8, 3),
+            rank=1,
+            price=11.0,
+            currency="GBP",
+        )
+    )
+    db.commit()
+
+    seed_categories(db)
+
+    cats = list(db.scalars(select(Category)).all())
+    slugs = {c.slug for c in cats}
+    assert "winter-hunt" not in slugs
+    assert "seasonal-hunt" in slugs
+    seasonal = next(c for c in cats if c.slug == "seasonal-hunt")
+    assert seasonal.name == "Seasonal Hunt"
+    snaps = list(db.scalars(select(ProductSnapshot)).all())
+    assert len(snaps) == 1
+    assert snaps[0].category_id == seasonal.id

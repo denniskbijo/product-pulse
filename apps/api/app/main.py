@@ -87,21 +87,20 @@ async def lifespan(_: FastAPI):
 settings = get_settings()
 app = FastAPI(title="Amazon Pulse API", version="0.1.0", lifespan=lifespan)
 
-origins = [o.strip() for o in settings.api_cors_origins.split(",") if o.strip()]
-# Allow Vercel preview/production frontends when CORS is left open via *.
-if "*" in origins:
-    cors_origins = ["*"]
-    allow_credentials = False
-else:
-    cors_origins = origins or ["http://localhost:3000"]
-    allow_credentials = True
+# Explicit allowlist only — never open CORS with "*".
+origins = [
+    o.strip()
+    for o in settings.api_cors_origins.split(",")
+    if o.strip() and o.strip() != "*"
+]
+cors_origins = origins or ["http://localhost:3000"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth.router)

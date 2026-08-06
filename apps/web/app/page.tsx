@@ -132,8 +132,8 @@ export default function HomePage() {
   const admin = isAdmin(session);
   const hasProducts = (data?.products.length ?? 0) > 0;
   const isWatchlist = selected === "watchlist";
-  const isCuratedList = selected === "watchlist" || selected === "winter-hunt";
-  const isWinterHunt = selected === "winter-hunt";
+  const isCuratedList = selected === "watchlist" || selected === "seasonal-hunt";
+  const isSeasonalHunt = selected === "seasonal-hunt";
 
   const load = (slug: string) => {
     startTransition(async () => {
@@ -312,7 +312,7 @@ export default function HomePage() {
             ? admin
               ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it (uses Easyparser)."
               : "Your custom watchlist. Admins can paste ASINs; you can add hunt candidates from Seasonal Hunt."
-            : isWinterHunt
+            : isSeasonalHunt
               ? "Candidates saved from Seasonal Hunt — current UK demand signals, not historical archives."
               : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
         </p>
@@ -402,7 +402,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {!hasProducts && isWinterHunt ? (
+      {!hasProducts && isSeasonalHunt ? (
         <section className="empty-cta">
           <h2>No Seasonal Hunt products yet</h2>
           <p className="note">

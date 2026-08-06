@@ -16,6 +16,7 @@ from app.hunt_catalog import (
 )
 from app.math_estimates import estimate_weekly_units, week_start_for
 from app.models import HuntResult, HuntRun, Product, ProductSnapshot
+from app.oxylabs_credits import OxylabsBudgetExceeded, reserve_oxylabs_credit
 from app.providers.discovery.oxylabs import OxylabsClient, oxylabs_configured
 from app.schemas import (
     HuntPromoteOut,
@@ -26,7 +27,7 @@ from app.schemas import (
 )
 from app.services import resolve_category
 
-HUNT_CATEGORY_SLUG = "winter-hunt"
+HUNT_CATEGORY_SLUG = "seasonal-hunt"
 # One Oxylabs realtime query per hunt (amazon_search or amazon_bestsellers).
 OXYLABS_REQUESTS_PER_HUNT = 1
 
@@ -91,9 +92,20 @@ def run_hunt(
         db.commit()
         return get_hunt_run(db, run.id)  # type: ignore[return-value]
 
+    # Reserve before the network call so failures and races still count.
+    try:
+        reserve_oxylabs_credit(db, settings, amount=OXYLABS_REQUESTS_PER_HUNT)
+    except OxylabsBudgetExceeded as exc:
+        run.status = "budget_exceeded"
+        run.error_message = str(exc)
+        run.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        return get_hunt_run(db, run.id)  # type: ignore[return-value]
+
+    run.credits_used = OXYLABS_REQUESTS_PER_HUNT
     client = OxylabsClient(settings)
     try:
-        hits, requests_used, source = client.hunt_catalog(
+        hits, _requests_used, source = client.hunt_catalog(
             keyword=product_type.search_keyword,
             top_n=top_n,
             browse_node=product_type.bestsellers_browse_node or None,
@@ -107,13 +119,12 @@ def run_hunt(
 
     _persist_hits(db, run=run, hits=hits)
     run.status = "success"
-    run.credits_used = requests_used
     run.provider = f"oxylabs:{source}"
     run.finished_at = datetime.now(timezone.utc)
     _prune_old_runs(db)
     db.commit()
 
-    # Auto-publish into the Winter Hunt category for all signed-in users.
+    # Auto-publish into the Seasonal Hunt category for all signed-in users.
     promote: HuntPromoteOut | None = None
     try:
         promote = promote_hunt_run_to_category(
@@ -141,7 +152,7 @@ def promote_hunt_run_to_category(
     category_slug: str = HUNT_CATEGORY_SLUG,
 ) -> HuntPromoteOut:
     """
-    Copy a successful hunt's candidates into a category (default: Winter Hunt).
+    Copy a successful hunt's candidates into a category (default: Seasonal Hunt).
     Uses hunt SEARCH fields only — no Easyparser DETAIL credits.
     """
     run = db.scalars(

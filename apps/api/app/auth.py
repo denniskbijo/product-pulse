@@ -9,6 +9,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import Settings, get_settings
+from app.passwords import verify_password
 
 Role = Literal["admin", "user"]
 
@@ -22,11 +23,12 @@ class AuthUser:
 
 
 def _configured_users(settings: Settings) -> dict[str, tuple[str, Role]]:
+    """Map username → (bcrypt hash, role). Plaintext env passwords are not used."""
     users: dict[str, tuple[str, Role]] = {}
-    if settings.admin_username and settings.admin_password:
-        users[settings.admin_username] = (settings.admin_password, "admin")
-    if settings.user_username and settings.user_password:
-        users[settings.user_username] = (settings.user_password, "user")
+    if settings.admin_username and settings.admin_password_hash:
+        users[settings.admin_username] = (settings.admin_password_hash, "admin")
+    if settings.user_username and settings.user_password_hash:
+        users[settings.user_username] = (settings.user_password_hash, "user")
     return users
 
 
@@ -34,9 +36,14 @@ def authenticate(username: str, password: str, settings: Settings) -> AuthUser |
     users = _configured_users(settings)
     entry = users.get(username)
     if entry is None:
+        # Dummy verify to reduce username-enumeration timing differences.
+        verify_password(
+            password,
+            "$2b$12$GGim1lb6UHAr8XshlH3J4OrvMKQLLKhANnRF6//m3ZU3PLhJmircG",
+        )
         return None
-    expected, role = entry
-    if password != expected:
+    expected_hash, role = entry
+    if not verify_password(password, expected_hash):
         return None
     return AuthUser(username=username, role=role)
 
@@ -94,6 +101,6 @@ def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role required to sync",
+            detail="Admin role required",
         )
     return user
