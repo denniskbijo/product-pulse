@@ -265,6 +265,7 @@ export type HuntRunSummary = {
   search_keyword: string;
   top_n: number;
   status: string;
+  provider: string | null;
   credits_used: number;
   result_count: number;
   error_message: string | null;
@@ -277,10 +278,50 @@ export type HuntRunDetail = HuntRunSummary & {
   disclaimer: string;
   results: HuntResult[];
   credits_remaining_budget: number | null;
+  category_slug: string | null;
+  category_saved: boolean;
+  category_message: string | null;
+};
+
+export type OxylabsCredits = {
+  month_key: string;
+  monthly_budget: number;
+  credits_used: number;
+  credits_remaining: number;
+  source: string;
+  configured: boolean;
+};
+
+export type HuntMeta = {
+  top_n: number;
+  provider: string;
+  oxylabs_configured: boolean;
+  uses_easyparser_credits: boolean;
+  oxylabs_requests_per_hunt: number;
+  auto_saves_to_category: boolean;
+  anyone_can_hunt: boolean;
+  disclaimer: string;
+  category_slug: string;
+  oxylabs_credits: OxylabsCredits | null;
+};
+
+export type HuntPromoteResult = {
+  status: string;
+  message: string;
+  category_slug: string;
+  category_name: string;
+  week_start: string;
+  products_added: number;
+  products_updated: number;
+  asins: string[];
 };
 
 export function getHuntSeasons() {
   return apiFetch<HuntSeason[]>("/hunt/seasons");
+}
+
+export function getHuntMeta() {
+  return apiFetch<HuntMeta>("/hunt/meta");
 }
 
 export function listHuntRuns() {
@@ -299,4 +340,21 @@ export function createHuntRun(seasonSlug: string, productTypeSlug: string) {
       product_type_slug: productTypeSlug,
     }),
   });
+}
+
+export function saveHuntRunToCategory(
+  runId: number,
+  categorySlug = "winter-hunt",
+) {
+  return apiFetch<HuntPromoteResult>(`/hunt/runs/${runId}/save-to-category`, {
+    method: "POST",
+    body: JSON.stringify({ category_slug: categorySlug }),
+  });
+}
+
+export function addHuntResultToWatchlist(runId: number, asin: string) {
+  return apiFetch<WatchlistProductAddResult>(
+    `/hunt/runs/${runId}/results/${encodeURIComponent(asin)}/watchlist`,
+    { method: "POST" },
+  );
 }

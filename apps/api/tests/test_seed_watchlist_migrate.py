@@ -66,6 +66,7 @@ def test_seed_merges_when_both_featured_and_watchlist_exist():
     cats = list(db.scalars(select(Category)).all())
     assert {c.slug for c in cats} == {
         "watchlist",
+        "winter-hunt",
         "home-kitchen",
         "electronics",
         "beauty",

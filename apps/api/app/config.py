@@ -27,8 +27,19 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{API_ROOT / 'amazon_pulse.db'}"
     monthly_credit_budget: int = 100
     sync_top_n: int = 10
-    # Winter Hunt SEARCH returns this many candidates (1 Easyparser credit).
+    # Winter Hunt candidates per run (Oxylabs only — no Easyparser fallback).
     hunt_top_n: int = 5
+    # Oxylabs Web Scraper API (required for Hunt).
+    # https://developers.oxylabs.io/products/web-scraper-api
+    oxylabs_username: str = ""
+    oxylabs_password: str = ""
+    oxylabs_base_url: str = "https://realtime.oxylabs.io/v1/queries"
+    # Usage stats API (remaining balance when /stats/limits is unavailable).
+    oxylabs_stats_url: str = "https://data.oxylabs.io/v2/stats"
+    # Soft budget for UI + hunt gating (trial/plan allotment). Default 1000.
+    oxylabs_monthly_credit_budget: int = 1000
+    # Amazon marketplace TLD for Oxylabs (co.uk, com, de, …).
+    oxylabs_amazon_domain: str = "co.uk"
     # Daily Amazon mobile price scrape (local/cron). Hard cap to stay polite.
     daily_scrape_max: int = 10
     daily_scrape_delay_seconds: float = 1.5

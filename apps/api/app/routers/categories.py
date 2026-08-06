@@ -32,8 +32,9 @@ def list_categories(
     _: AuthUser = Depends(get_current_user),
 ) -> list[Category]:
     cats = list(db.scalars(select(Category).order_by(Category.name.asc())).all())
-    # Keep Watchlist at the top of the picker.
-    cats.sort(key=lambda c: (0 if c.slug == "watchlist" else 1, c.name.lower()))
+    # Keep curated lists ahead of scrape categories.
+    priority = {"watchlist": 0, "winter-hunt": 1}
+    cats.sort(key=lambda c: (priority.get(c.slug, 9), c.name.lower()))
     return cats
 
 
@@ -122,12 +123,12 @@ def trigger_sync(
     category = resolve_category(db, category_id)
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
-    if category.slug == "watchlist":
+    if category.slug in {"watchlist", "winter-hunt"}:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Watchlist is a custom list — add products one at a time via "
-                "POST /categories/watchlist/products (no category sync)."
+                f"{category.name} is a custom list — add products from Hunt or "
+                "Watchlist (no category bestsellers sync)."
             ),
         )
 

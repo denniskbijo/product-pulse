@@ -179,6 +179,7 @@ class HuntRunSummaryOut(BaseModel):
     search_keyword: str
     top_n: int
     status: str
+    provider: str | None = None
     credits_used: int = 0
     result_count: int = 0
     error_message: str | None = None
@@ -191,3 +192,43 @@ class HuntRunDetailOut(HuntRunSummaryOut):
     disclaimer: str
     results: list[HuntResultOut] = Field(default_factory=list)
     credits_remaining_budget: int | None = None
+    category_slug: str | None = None
+    category_saved: bool = False
+    category_message: str | None = None
+
+
+class OxylabsCreditsOut(BaseModel):
+    month_key: str
+    monthly_budget: int
+    credits_used: int
+    credits_remaining: int
+    source: str  # oxylabs_stats | local_hunts | budget
+    configured: bool
+
+
+class HuntMetaOut(BaseModel):
+    top_n: int
+    provider: str = "oxylabs"
+    oxylabs_configured: bool
+    uses_easyparser_credits: bool = False
+    oxylabs_requests_per_hunt: int = 1
+    auto_saves_to_category: bool = True
+    anyone_can_hunt: bool = True
+    disclaimer: str
+    category_slug: str = "winter-hunt"
+    oxylabs_credits: OxylabsCreditsOut | None = None
+
+
+class HuntPromoteIn(BaseModel):
+    category_slug: str = "winter-hunt"
+
+
+class HuntPromoteOut(BaseModel):
+    status: str
+    message: str
+    category_slug: str
+    category_name: str
+    week_start: date
+    products_added: int = 0
+    products_updated: int = 0
+    asins: list[str] = Field(default_factory=list)

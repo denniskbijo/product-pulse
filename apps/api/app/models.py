@@ -147,6 +147,8 @@ class HuntRun(Base):
     search_keyword: Mapped[str] = mapped_column(String(255))
     top_n: Mapped[int] = mapped_column(Integer, default=5)
     status: Mapped[str] = mapped_column(String(32), default="running")
+    # easyparser | oxylabs | oxylabs:amazon_search | oxylabs:amazon_bestsellers
+    provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
     credits_used: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(128), nullable=True)

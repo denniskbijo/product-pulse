@@ -10,6 +10,11 @@ SEED_CATEGORIES = [
         "bestsellers_url": "https://www.amazon.co.uk/",
     },
     {
+        "slug": "winter-hunt",
+        "name": "Winter Hunt",
+        "bestsellers_url": "https://www.amazon.co.uk/",
+    },
+    {
         "slug": "home-kitchen",
         "name": "Home & Kitchen",
         "bestsellers_url": "https://www.amazon.co.uk/gp/bestsellers/kitchen",

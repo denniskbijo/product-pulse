@@ -11,6 +11,9 @@ class ProductType:
     name: str
     description: str
     search_keyword: str
+    # Optional Amazon UK Best Sellers browse-node ID for Oxylabs amazon_bestsellers.
+    # Leave empty to use amazon_search with search_keyword instead.
+    bestsellers_browse_node: str = ""
 
 
 @dataclass(frozen=True)
@@ -34,48 +37,56 @@ WINTER = Season(
             name="Home heating & warmth",
             description="Portable heaters, radiators, and room warmth.",
             search_keyword="space heater",
+            bestsellers_browse_node="",  # TODO: UK browse node for heaters
         ),
         ProductType(
             slug="sleep-bedding",
             name="Sleep & bedding comfort",
             description="Electric blankets, heated throws, warm bedding.",
             search_keyword="electric blanket",
+            bestsellers_browse_node="",  # TODO: UK browse node for electric blankets
         ),
         ProductType(
             slug="air-quality",
             name="Air quality",
             description="Humidifiers and dehumidifiers for closed-up homes.",
             search_keyword="humidifier",
+            bestsellers_browse_node="",
         ),
         ProductType(
             slug="cold-weather-clothing",
             name="Cold-weather clothing",
             description="Gloves, thermals, and outer layers.",
             search_keyword="winter gloves",
+            bestsellers_browse_node="",
         ),
         ProductType(
             slug="christmas-gifting",
             name="Christmas & gifting",
             description="Lights, calendars, and gift-season staples.",
             search_keyword="christmas tree lights",
+            bestsellers_browse_node="",
         ),
         ProductType(
             slug="kitchen-comfort",
             name="Kitchen comfort",
             description="Soup makers, hot-drink helpers, winter kitchen gear.",
             search_keyword="soup maker",
+            bestsellers_browse_node="",
         ),
         ProductType(
             slug="draft-insulation",
             name="Drafts & insulation",
             description="Draft excluders and simple heat-loss fixes.",
             search_keyword="draft excluder",
+            bestsellers_browse_node="",
         ),
         ProductType(
             slug="personal-warmth",
             name="Personal warmth",
             description="Hot water bottles and portable personal heat.",
             search_keyword="hot water bottle",
+            bestsellers_browse_node="",
         ),
     ),
 )

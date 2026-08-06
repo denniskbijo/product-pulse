@@ -132,6 +132,8 @@ export default function HomePage() {
   const admin = isAdmin(session);
   const hasProducts = (data?.products.length ?? 0) > 0;
   const isWatchlist = selected === "watchlist";
+  const isCuratedList = selected === "watchlist" || selected === "winter-hunt";
+  const isWinterHunt = selected === "winter-hunt";
 
   const load = (slug: string) => {
     startTransition(async () => {
@@ -160,7 +162,12 @@ export default function HomePage() {
     getCategories()
       .then((cats) => {
         setCategories(cats);
+        const fromQuery =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("category")
+            : null;
         const initial =
+          (fromQuery && cats.find((c) => c.slug === fromQuery)?.slug) ||
           cats.find((c) => c.slug === "watchlist")?.slug ||
           cats.find((c) => c.slug === "home-kitchen")?.slug ||
           cats[0]?.slug;
@@ -303,7 +310,9 @@ export default function HomePage() {
         <p className="lede">
           {isWatchlist
             ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it."
-            : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
+            : isWinterHunt
+              ? "Candidates saved from Winter Hunt — current UK demand signals, not December archives."
+              : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
         </p>
         <div className="controls">
           <div className="field">
@@ -352,7 +361,7 @@ export default function HomePage() {
               </button>
             </>
           ) : null}
-          {admin && !isWatchlist ? (
+          {admin && !isCuratedList ? (
             <>
               <button
                 className={hasProducts ? "button secondary" : "button"}
@@ -390,7 +399,17 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {!hasProducts && admin && !isWatchlist ? (
+      {!hasProducts && isWinterHunt ? (
+        <section className="empty-cta">
+          <h2>No Winter Hunt products yet</h2>
+          <p className="note">
+            Anyone signed in can run a hunt from{" "}
+            <a href="/hunt">Winter Hunt</a>; results auto-save here.
+          </p>
+        </section>
+      ) : null}
+
+      {!hasProducts && admin && !isCuratedList ? (
         <section className="empty-cta">
           <h2>No products yet</h2>
           <p className="note">
@@ -418,7 +437,7 @@ export default function HomePage() {
           <details className="system-details">
             <summary>System details</summary>
             <div className="system-details-body">
-              {!isWatchlist && data?.sync.last_status ? (
+              {!isCuratedList && data?.sync.last_status ? (
                 <div>
                   Last sync status: <strong>{data.sync.last_status}</strong>
                 </div>

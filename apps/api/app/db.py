@@ -46,12 +46,19 @@ def _ensure_columns() -> None:
     from sqlalchemy import inspect, text
 
     inspector = inspect(engine)
-    if "products" not in inspector.get_table_names():
-        return
-    columns = {col["name"] for col in inspector.get_columns("products")}
-    if "notes" not in columns:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE products ADD COLUMN notes TEXT"))
+    tables = set(inspector.get_table_names())
+    if "products" in tables:
+        columns = {col["name"] for col in inspector.get_columns("products")}
+        if "notes" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE products ADD COLUMN notes TEXT"))
+    if "hunt_runs" in tables:
+        columns = {col["name"] for col in inspector.get_columns("hunt_runs")}
+        if "provider" not in columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE hunt_runs ADD COLUMN provider VARCHAR(64)")
+                )
 
 
 def init_db() -> None:

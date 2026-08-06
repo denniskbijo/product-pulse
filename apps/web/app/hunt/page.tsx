@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  addWatchlistProduct,
+  addHuntResultToWatchlist,
   createHuntRun,
+  getHuntMeta,
   getHuntRun,
   getHuntSeasons,
   listHuntRuns,
+  saveHuntRunToCategory,
+  type HuntMeta,
   type HuntRunDetail,
   type HuntRunSummary,
   type HuntSeason,
@@ -40,6 +43,8 @@ export default function HuntPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [addingAsin, setAddingAsin] = useState<string | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [meta, setMeta] = useState<HuntMeta | null>(null);
 
   const admin = isAdmin(session);
   const season = useMemo(
@@ -60,10 +65,11 @@ export default function HuntPage() {
 
   useEffect(() => {
     if (!ready || !session) return;
-    Promise.all([getHuntSeasons(), listHuntRuns()])
-      .then(([seasonList, runList]) => {
+    Promise.all([getHuntSeasons(), listHuntRuns(), getHuntMeta()])
+      .then(([seasonList, runList, huntMeta]) => {
         setSeasons(seasonList);
         setRuns(runList);
+        setMeta(huntMeta);
         const winter = seasonList.find((s) => s.slug === "winter") || seasonList[0];
         if (winter) {
           setSeasonSlug(winter.slug);
@@ -96,6 +102,7 @@ export default function HuntPage() {
           search_keyword: detail.search_keyword,
           top_n: detail.top_n,
           status: detail.status,
+          provider: detail.provider,
           credits_used: detail.credits_used,
           result_count: detail.result_count,
           error_message: detail.error_message,
@@ -106,9 +113,22 @@ export default function HuntPage() {
         ...prev.filter((r) => r.id !== detail.id),
       ]);
       if (detail.status === "success") {
-        setMessage(
-          `Found ${detail.result_count} candidate${detail.result_count === 1 ? "" : "s"} · ${detail.credits_used} credit used`,
-        );
+        const parts = [
+          `Found ${detail.result_count} candidate${detail.result_count === 1 ? "" : "s"}`,
+          `${detail.credits_used} Oxylabs request`,
+        ];
+        if (detail.category_saved) {
+          parts.push(
+            detail.category_message ||
+              "saved to Winter Hunt category for everyone",
+          );
+        }
+        setMessage(parts.join(" · "));
+        try {
+          setMeta(await getHuntMeta());
+        } catch {
+          /* keep prior meta */
+        }
       } else {
         setError(detail.error_message || detail.status);
       }
@@ -128,12 +148,43 @@ export default function HuntPage() {
     }
   };
 
+  const onSaveToCategory = async () => {
+    if (!admin || !activeRun || activeRun.status !== "success") return;
+    setSavingCategory(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await saveHuntRunToCategory(
+        activeRun.id,
+        meta?.category_slug || "winter-hunt",
+      );
+      setActiveRun((prev) =>
+        prev
+          ? {
+              ...prev,
+              category_saved: true,
+              category_slug: result.category_slug,
+              category_message: result.message,
+            }
+          : prev,
+      );
+      setMessage(`${result.message} Category refreshed.`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to refresh category",
+      );
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   const onAddWatchlist = async (asin: string) => {
+    if (!activeRun) return;
     setAddingAsin(asin);
     setError(null);
     setMessage(null);
     try {
-      const result = await addWatchlistProduct(asin);
+      const result = await addHuntResultToWatchlist(activeRun.id, asin);
       if (result.status === "success") {
         setMessage(result.message);
       } else {
@@ -176,9 +227,9 @@ export default function HuntPage() {
           </div>
         </div>
         <p className="lede">
-          Start with a season, pick a product type, then find five live UK
-          candidates. This shows current Amazon demand — not last December’s
-          bestsellers archive.
+          Pick a product type and run a hunt — results auto-save to the Winter
+          Hunt category for everyone signed in. Current UK demand only — not
+          last December’s archive.
         </p>
       </section>
 
@@ -217,17 +268,18 @@ export default function HuntPage() {
               ))}
             </select>
           </div>
-          {admin ? (
-            <button
-              className="button"
-              disabled={running || !typeSlug}
-              onClick={() => void onRun()}
-            >
-              {running ? "Searching…" : "Run hunt (1 credit)"}
-            </button>
-          ) : (
-            <p className="note">Only admins can run hunts. You can browse recent results.</p>
-          )}
+          <button
+            className="button"
+            disabled={
+              running ||
+              !typeSlug ||
+              !meta?.oxylabs_configured ||
+              (meta.oxylabs_credits?.credits_remaining ?? 1) < 1
+            }
+            onClick={() => void onRun()}
+          >
+            {running ? "Searching…" : "Run hunt"}
+          </button>
         </div>
         {season ? <p className="note">{season.blurb}</p> : null}
         {productTypes.find((p) => p.slug === typeSlug)?.description ? (
@@ -235,10 +287,26 @@ export default function HuntPage() {
             {productTypes.find((p) => p.slug === typeSlug)?.description}
           </p>
         ) : null}
-        {admin && activeRun?.credits_remaining_budget != null ? (
+        {meta?.oxylabs_credits ? (
           <p className="note">
-            Enrichment credits left this month:{" "}
-            <strong>{activeRun.credits_remaining_budget}</strong>
+            Oxylabs results left this month:{" "}
+            <strong>{meta.oxylabs_credits.credits_remaining}</strong>
+            {" / "}
+            {meta.oxylabs_credits.monthly_budget}
+            {" · "}
+            {meta.oxylabs_credits.credits_used} used
+            {admin
+              ? ` · source: ${meta.oxylabs_credits.source}`
+              : ""}
+          </p>
+        ) : null}
+        {meta ? (
+          <p className="note">
+            Cost: <strong>1 Oxylabs request</strong> per hunt. Results auto-save
+            to the Winter Hunt category
+            {meta.oxylabs_configured
+              ? "."
+              : " — Oxylabs credentials are not configured yet."}
           </p>
         ) : null}
         {message ? <p className="note">{message}</p> : null}
@@ -280,8 +348,31 @@ export default function HuntPage() {
               <div>
                 <strong>{activeRun.product_type_name}</strong> ·{" "}
                 {activeRun.search_keyword} · {activeRun.status}
+                {activeRun.provider ? ` · ${activeRun.provider}` : ""}
               </div>
               <p className="note">{activeRun.disclaimer}</p>
+              {activeRun.status === "success" &&
+              activeRun.results.length > 0 ? (
+                <div className="product-actions" style={{ marginTop: "0.75rem" }}>
+                  <a className="button compact" href="/?category=winter-hunt">
+                    Open Winter Hunt category
+                  </a>
+                  {admin ? (
+                    <button
+                      type="button"
+                      className="button secondary compact"
+                      disabled={savingCategory}
+                      onClick={() => void onSaveToCategory()}
+                      title="Successful hunts already auto-save; use this to refresh ranks"
+                    >
+                      {savingCategory ? "Refreshing…" : "Refresh category"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {activeRun.category_message ? (
+                <p className="note">{activeRun.category_message}</p>
+              ) : null}
             </div>
 
             <ul className="hunt-results">
@@ -360,9 +451,10 @@ export default function HuntPage() {
       </section>
 
       <p className="footer">
-        Each hunt uses 1 Easyparser SEARCH credit and returns up to five
-        candidates. Adding to Watchlist uses a separate DETAIL credit for full
-        enrichment. Historical winter validation (Keepa) is not part of this MVP.
+        Hunt uses 1 Oxylabs request per run. Saving to Winter Hunt and Add to
+        Watchlist from hunt results use that data only — 0 extra credits.
+        Pasting a new ASIN on the dashboard Watchlist still uses 1 Easyparser
+        DETAIL credit.
       </p>
     </main>
   );
