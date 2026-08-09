@@ -13,6 +13,7 @@ import {
   triggerSync,
   updateProductNotes,
 } from "@/lib/api";
+import { Toast, useToast } from "@/components/Toast";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
 import { formatBsr, formatMonthlySold, formatPriceChange } from "@/lib/labels";
 
@@ -114,10 +115,8 @@ export default function HomePage() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [watchlistInput, setWatchlistInput] = useState("");
   const [addingWatchlist, setAddingWatchlist] = useState(false);
-  const [watchlistAddMessage, setWatchlistAddMessage] = useState<string | null>(
-    null,
-  );
   const [watchlistAddError, setWatchlistAddError] = useState<string | null>(null);
+  const { toast, showToast, dismissToast, durationMs } = useToast();
   const [actionAsin, setActionAsin] = useState<string | null>(null);
   const [notesEditor, setNotesEditor] = useState<{
     asin: string;
@@ -216,12 +215,11 @@ export default function HomePage() {
     const input = watchlistInput.trim();
     if (!input) return;
     setAddingWatchlist(true);
-    setWatchlistAddMessage(null);
     setWatchlistAddError(null);
     try {
       const result = await addWatchlistProduct(input);
       if (result.status === "success") {
-        setWatchlistAddMessage(result.message);
+        showToast(result.message);
         setWatchlistInput("");
         if (selected !== "watchlist") {
           setSelected("watchlist");
@@ -381,13 +379,20 @@ export default function HomePage() {
             </>
           ) : null}
         </div>
-        {watchlistAddMessage ? (
-          <p className="note">{watchlistAddMessage}</p>
-        ) : null}
         {watchlistAddError ? (
           <p className="error">{watchlistAddError}</p>
         ) : null}
       </section>
+
+      {toast ? (
+        <Toast
+          key={toast.id}
+          toastKey={toast.id}
+          message={toast.message}
+          onClose={dismissToast}
+          durationMs={durationMs}
+        />
+      ) : null}
 
       {!hasProducts && isWatchlist ? (
         <section className="empty-cta">

@@ -15,6 +15,7 @@ import {
   type HuntRunSummary,
   type HuntSeason,
 } from "@/lib/api";
+import { Toast, useToast } from "@/components/Toast";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
 import { formatMonthlySold } from "@/lib/labels";
 
@@ -40,7 +41,7 @@ export default function HuntPage() {
   const [runs, setRuns] = useState<HuntRunSummary[]>([]);
   const [activeRun, setActiveRun] = useState<HuntRunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const { toast, showToast, dismissToast, durationMs } = useToast();
   const [running, setRunning] = useState(false);
   const [addingAsin, setAddingAsin] = useState<string | null>(null);
   const [savingCategory, setSavingCategory] = useState(false);
@@ -91,7 +92,6 @@ export default function HuntPage() {
     if (!typeSlug) return;
     setRunning(true);
     setError(null);
-    setMessage(null);
     try {
       const detail = await createHuntRun(seasonSlug, typeSlug);
       setActiveRun(detail);
@@ -125,7 +125,7 @@ export default function HuntPage() {
               "saved to Seasonal Hunt category for everyone",
           );
         }
-        setMessage(parts.join(" · "));
+        showToast(parts.join(" · "));
         try {
           setMeta(await getHuntMeta());
         } catch {
@@ -154,7 +154,6 @@ export default function HuntPage() {
     if (!activeRun || activeRun.status !== "success") return;
     setSavingCategory(true);
     setError(null);
-    setMessage(null);
     try {
       const result = await saveHuntRunToCategory(
         activeRun.id,
@@ -170,7 +169,7 @@ export default function HuntPage() {
             }
           : prev,
       );
-      setMessage(`${result.message} Category refreshed.`);
+      showToast(`${result.message} Category refreshed.`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to refresh category",
@@ -184,11 +183,10 @@ export default function HuntPage() {
     if (!activeRun) return;
     setAddingAsin(asin);
     setError(null);
-    setMessage(null);
     try {
       const result = await addHuntResultToWatchlist(activeRun.id, asin);
       if (result.status === "success") {
-        setMessage(result.message);
+        showToast(result.message);
       } else {
         setError(result.message);
       }
@@ -319,7 +317,6 @@ export default function HuntPage() {
               : " — Oxylabs credentials are not configured yet."}
           </p>
         ) : null}
-        {message ? <p className="note">{message}</p> : null}
         {error ? <p className="error">{error}</p> : null}
       </section>
 
@@ -464,6 +461,16 @@ export default function HuntPage() {
         Pasting a new ASIN on the dashboard Watchlist uses 1 Easyparser DETAIL
         credit.
       </p>
+
+      {toast ? (
+        <Toast
+          key={toast.id}
+          toastKey={toast.id}
+          message={toast.message}
+          onClose={dismissToast}
+          durationMs={durationMs}
+        />
+      ) : null}
     </main>
   );
 }
