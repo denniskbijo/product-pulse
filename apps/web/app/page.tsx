@@ -309,9 +309,7 @@ export default function HomePage() {
         </div>
         <p className="lede">
           {isWatchlist
-            ? admin
-              ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it (uses Easyparser)."
-              : "Your custom watchlist. Admins can paste ASINs; you can add hunt candidates from Seasonal Hunt."
+            ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it (uses Easyparser), or add candidates from Seasonal Hunt (free)."
             : isSeasonalHunt
               ? "Candidates saved from Seasonal Hunt — current UK demand signals, not historical archives."
               : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
@@ -335,7 +333,7 @@ export default function HomePage() {
               ))}
             </select>
           </div>
-          {isWatchlist && admin ? (
+          {isWatchlist ? (
             <>
               <div className="field field-watchlist">
                 <label htmlFor="watchlist-input">ASIN or Amazon UK URL</label>
@@ -395,9 +393,8 @@ export default function HomePage() {
         <section className="empty-cta">
           <h2>No watchlist products yet</h2>
           <p className="note">
-            {admin
-              ? "Watchlist is your custom list. Paste an ASIN or Amazon UK URL above to add one product at a time."
-              : "Watchlist is a shared list. Ask an admin to paste an ASIN, or add candidates from Seasonal Hunt (no Easyparser credit)."}
+            Paste an ASIN or Amazon UK URL above to add one product at a time, or
+            add candidates from Seasonal Hunt (no Easyparser credit).
           </p>
         </section>
       ) : null}

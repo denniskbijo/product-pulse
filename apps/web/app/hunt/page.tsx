@@ -461,8 +461,8 @@ export default function HuntPage() {
       <p className="footer">
         Hunt uses 1 Oxylabs request per run. Saving to Seasonal Hunt and Add to
         Watchlist from hunt results use that data only — 0 extra credits.
-        Pasting a new ASIN on the dashboard Watchlist is admin-only and uses 1
-        Easyparser DETAIL credit.
+        Pasting a new ASIN on the dashboard Watchlist uses 1 Easyparser DETAIL
+        credit.
       </p>
     </main>
   );

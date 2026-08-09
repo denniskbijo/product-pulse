@@ -5,7 +5,7 @@ Amazon UK product research MVP: browse category top sellers, maintain a personal
 ## Architecture
 
 - **Discover (bestsellers)** — parse `amazon.co.uk/gp/bestsellers/...` HTML (0 Easyparser credits)
-- **Enrich** — Easyparser `DETAIL` for Watchlist ASIN paste and weekly category sync (admin)
+- **Enrich** — Easyparser `DETAIL` for Watchlist ASIN paste (any signed-in user) and weekly category sync (admin)
 - **Seasonal Hunt** — Oxylabs Amazon SEARCH / bestsellers (1 Oxylabs result per run; no Easyparser fallback). Results auto-save to the `seasonal-hunt` category
 - **Weekly history** — `product_snapshots` for BSR, sales estimates, and week-vs-week fallback
 - **Daily prices** — Amazon mobile pages (`/gp/aw/d/{ASIN}`) via `make scrape-prices` / Vercel Cron (no Easyparser)
@@ -45,10 +45,10 @@ make run       # API :8000 + web :3000
 
 Open http://localhost:3000 and sign in.
 
-| Role | Can run Seasonal Hunt | Can sync categories / paste Watchlist ASINs | Sees Easyparser credits |
-|---|---|---|---|
-| Admin | Yes | Yes | Yes |
-| User | Yes | No | No (sees last sync time + products) |
+| Role | Can run Seasonal Hunt | Paste Watchlist ASINs | Can sync categories | Sees Easyparser credits |
+|---|---|---|---|---|
+| Admin | Yes | Yes | Yes | Yes |
+| User | Yes | Yes | No | No (sees last sync time + products) |
 
 Anyone must log in to view products. Tokens are JWTs; the API CORS allowlist must include your web origin (never `*`).
 
