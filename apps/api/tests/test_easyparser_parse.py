@@ -17,7 +17,14 @@ def test_parse_detail_payload_nested_result_detail():
             "detail": {
                 "title": "Test Kettle",
                 "brand": "BrandX",
-                "buybox_winner": {"price": 24.99, "currency": "GBP"},
+                "buybox_winner": {
+                    "price": {
+                        "value": 24.99,
+                        "currency": "GBP",
+                        "symbol": "£",
+                        "raw": "£24.99",
+                    }
+                },
                 "rating": 4.5,
                 "reviews_total": 1234,
                 "bought_activity": {"period": "past month", "raw": "700+ bought", "value": 700},
@@ -30,11 +37,36 @@ def test_parse_detail_payload_nested_result_detail():
     product = parse_detail_payload("B0TESTASIN", body)
     assert product.title == "Test Kettle"
     assert product.price == 24.99
+    assert product.currency == "GBP"
     assert product.monthly_sold == 700
     assert product.bsr == 12
     assert product.review_count == 1234
     assert product.credits_remaining == 97
     assert product.image_url == "https://example.com/img.jpg"
+
+
+def test_parse_detail_reads_nested_usd_currency_not_invented_gbp():
+    """Easyparser often returns USD price objects even for co.uk ASINs."""
+    body = {
+        "request_info": {"success": True, "credit_used_this_request": 1},
+        "result": {
+            "detail": {
+                "title": "Bidet",
+                "buybox_winner": {
+                    "price": {
+                        "currency": "USD",
+                        "raw": "USD66.11",
+                        "symbol": "USD",
+                        "value": "66.11",
+                    }
+                },
+                "url": "https://www.amazon.co.uk/dp/B0GV4558G7",
+            }
+        },
+    }
+    product = parse_detail_payload("B0GV4558G7", body)
+    assert product.price == 66.11
+    assert product.currency == "USD"
 
 
 def test_parse_bestsellers_rank_operation():

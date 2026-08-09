@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.asin import parse_asin_from_input
 from app.config import Settings
 from app.credits import credit_status, get_or_create_ledger, record_credit_usage
+from app.listing_price import resolve_uk_listing_price, upsert_daily_price_point
 from app.math_estimates import estimate_weekly_units, price_change, week_start_for
 from app.models import Category, DailyPricePoint, Product, ProductSnapshot
 from app.providers.enrichment.easyparser import CreditBudgetExceeded, EasyparserClient
@@ -286,8 +287,18 @@ def add_product_to_watchlist(
         db.add(existing)
 
     existing.rank = rank
-    existing.price = enriched.price
-    existing.currency = enriched.currency
+    price, currency = resolve_uk_listing_price(
+        asin,
+        fallback_price=enriched.price,
+        fallback_currency=enriched.currency,
+        settings=settings,
+    )
+    existing.price = price
+    existing.currency = currency
+    if price is not None:
+        upsert_daily_price_point(
+            db, asin=asin, price=price, currency=currency or "GBP"
+        )
     existing.bsr = enriched.bsr
     existing.rating = enriched.rating
     existing.review_count = enriched.review_count

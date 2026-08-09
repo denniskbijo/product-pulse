@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.credits import credit_status, get_or_create_ledger, record_credit_usage
+from app.listing_price import resolve_uk_listing_price, upsert_daily_price_point
 from app.math_estimates import estimate_weekly_units, week_start_for
 from app.models import Category, Product, ProductSnapshot, SyncRun
 from app.providers.discovery.bestsellers_html import BestsellerEntry, fetch_bestsellers
@@ -141,8 +142,21 @@ def run_category_sync(
                 # Refresh data in place; keep the product's existing rank.
                 pass
 
-            existing.price = enriched.price
-            existing.currency = enriched.currency
+            price, currency = resolve_uk_listing_price(
+                entry.asin,
+                fallback_price=enriched.price,
+                fallback_currency=enriched.currency,
+                settings=settings,
+            )
+            existing.price = price
+            existing.currency = currency
+            if price is not None:
+                upsert_daily_price_point(
+                    db,
+                    asin=entry.asin,
+                    price=price,
+                    currency=currency or "GBP",
+                )
             existing.bsr = enriched.bsr
             existing.rating = enriched.rating
             existing.review_count = enriched.review_count

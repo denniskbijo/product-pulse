@@ -204,25 +204,72 @@ def _extract_image(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _extract_price(payload: dict[str, Any]) -> tuple[float | None, str | None]:
-    buybox = payload.get("buybox_winner")
-    if isinstance(buybox, dict):
-        price = _as_float(
-            _first_present(buybox, ["price", "price_value", "value", "current_price"])
-        )
-        currency = _first_present(buybox, ["currency", "currency_symbol"])
-        if isinstance(currency, dict):
-            currency = currency.get("code") or currency.get("symbol")
-        if price is not None:
-            return price, str(currency) if currency else "GBP"
-
-    price = _as_float(
-        _first_present(payload, ["price", "priceValue", "currentPrice", "buyBoxPrice"])
-    )
-    currency = _first_present(payload, ["currency", "currencyCode"])
+def _currency_from_price_node(node: Any) -> str | None:
+    """Read currency from Easyparser price objects ({value, currency, symbol, raw})."""
+    if not isinstance(node, dict):
+        return None
+    currency = _first_present(node, ["currency", "currency_code", "currencyCode"])
     if isinstance(currency, dict):
         currency = currency.get("code") or currency.get("symbol")
-    return price, str(currency) if currency else ("GBP" if price is not None else None)
+    if isinstance(currency, str) and currency.strip():
+        cleaned = currency.strip().upper().replace("£", "GBP")
+        if cleaned in {"USD", "GBP", "EUR", "JPY", "CAD", "AUD", "INR"}:
+            return cleaned
+        if "USD" in cleaned:
+            return "USD"
+        if "GBP" in cleaned:
+            return "GBP"
+        return cleaned
+    symbol = node.get("symbol")
+    if isinstance(symbol, str):
+        if "£" in symbol or symbol.strip().upper() == "GBP":
+            return "GBP"
+        if symbol.strip() == "$" or symbol.strip().upper() == "USD":
+            return "USD"
+        if "€" in symbol or symbol.strip().upper() == "EUR":
+            return "EUR"
+    raw = node.get("raw")
+    if isinstance(raw, str):
+        upper = raw.upper()
+        if upper.startswith("USD") or "$" in raw:
+            return "USD"
+        if upper.startswith("GBP") or "£" in raw:
+            return "GBP"
+        if "€" in raw:
+            return "EUR"
+    return None
+
+
+def _extract_price(payload: dict[str, Any]) -> tuple[float | None, str | None]:
+    """
+    Extract buybox/list price. Currency is taken from the price object itself —
+    Easyparser nests it under buybox_winner.price.currency (not buybox_winner.currency).
+    Do not invent GBP when currency is missing; callers must treat unknown carefully.
+    """
+    buybox = payload.get("buybox_winner")
+    if isinstance(buybox, dict):
+        price_node = _first_present(
+            buybox, ["price", "price_value", "current_price", "value"]
+        )
+        price = _as_float(price_node)
+        currency = _currency_from_price_node(price_node) or _currency_from_price_node(
+            buybox
+        )
+        if price is not None:
+            return price, currency
+
+    price_node = _first_present(
+        payload, ["price", "priceValue", "currentPrice", "buyBoxPrice"]
+    )
+    price = _as_float(price_node)
+    currency = _currency_from_price_node(price_node)
+    if currency is None:
+        currency = _first_present(payload, ["currency", "currencyCode"])
+        if isinstance(currency, dict):
+            currency = currency.get("code") or currency.get("symbol")
+        if isinstance(currency, str):
+            currency = currency.strip().upper().replace("£", "GBP")
+    return price, currency if isinstance(currency, str) else None
 
 
 def parse_detail_payload(asin: str, body: dict[str, Any]) -> EnrichedProduct:
@@ -275,7 +322,7 @@ def parse_detail_payload(asin: str, body: dict[str, Any]) -> EnrichedProduct:
         brand=str(brand) if brand else None,
         product_url=str(product_url) if product_url else None,
         price=price,
-        currency=currency or "GBP",
+        currency=currency,
         bsr=_extract_bsr(product),
         rating=rating,
         review_count=review_count,

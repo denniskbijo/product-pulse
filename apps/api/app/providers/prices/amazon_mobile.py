@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 MOBILE_UA = (
     "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 "
@@ -19,6 +19,26 @@ BLOCK_MARKERS = (
     "api-services-support@amazon.com",
     "enter the characters you see below",
     "sorry, we just need to make sure you're not a robot",
+)
+
+# Prefer the product buybox over sponsored / related carousels that also use a-price.
+BUYBOX_SELECTORS = (
+    "#tp_price_block_total_price_ww span.a-offscreen",
+    "#corePriceDisplay_mobile_feature_div span.a-price.aok-align-center span.a-offscreen",
+    "#corePriceDisplay_mobile_feature_div span.a-offscreen",
+    "#corePrice_feature_div span.a-offscreen",
+    "#apex_offerDisplay_desktop span.a-offscreen",
+    "span.priceToPay span.a-offscreen",
+    ".a-price.reinventPricePriceToPayMargin span.a-offscreen",
+)
+
+SPONSORED_MARKERS = (
+    "sp_ilm",
+    "sp_phone",
+    "sp_detail",
+    "AdHolder",
+    "sponsored",
+    "puis-sponsored",
 )
 
 
@@ -42,6 +62,35 @@ def is_blocked_html(html: str) -> bool:
     return any(marker in lower for marker in BLOCK_MARKERS)
 
 
+def _parse_price_text(text: str) -> tuple[float | None, str | None]:
+    cleaned = text.strip()
+    if not cleaned or cleaned.lower() == "null":
+        return None, None
+    currency: str | None = None
+    if "£" in cleaned or "GBP" in cleaned.upper():
+        currency = "GBP"
+    elif "$" in cleaned or "USD" in cleaned.upper():
+        currency = "USD"
+    elif "€" in cleaned or "EUR" in cleaned.upper():
+        currency = "EUR"
+    match = PRICE_RE.search(cleaned.replace(",", ""))
+    if not match:
+        return None, currency
+    return float(match.group(1)), currency
+
+
+def _is_sponsored_context(el: Tag) -> bool:
+    for parent in el.parents:
+        if not isinstance(parent, Tag):
+            continue
+        pid = parent.get("id") or ""
+        classes = " ".join(parent.get("class") or [])
+        blob = f"{pid} {classes}"
+        if any(marker in blob for marker in SPONSORED_MARKERS):
+            return True
+    return False
+
+
 def parse_mobile_product_html(html: str, *, asin: str) -> MobilePriceResult:
     if is_blocked_html(html):
         return MobilePriceResult(asin=asin, status="blocked", error="Amazon bot check page")
@@ -52,19 +101,29 @@ def parse_mobile_product_html(html: str, *, asin: str) -> MobilePriceResult:
 
     price: float | None = None
     currency: str | None = None
-    for el in soup.select("span.a-price span.a-offscreen"):
-        text = el.get_text(" ", strip=True)
-        if not text:
-            continue
-        if "£" in text:
-            currency = "GBP"
-        elif "$" in text:
-            currency = "USD"
-        elif "€" in text:
-            currency = "EUR"
-        match = PRICE_RE.search(text.replace(",", ""))
-        if match:
-            price = float(match.group(1))
+
+    # 1) Explicit buybox containers first.
+    for selector in BUYBOX_SELECTORS:
+        for el in soup.select(selector):
+            parsed_price, parsed_currency = _parse_price_text(el.get_text(" ", strip=True))
+            if parsed_price is None:
+                continue
+            price = parsed_price
+            currency = parsed_currency
+            break
+        if price is not None:
+            break
+
+    # 2) Fallback: first non-sponsored a-price offscreen.
+    if price is None:
+        for el in soup.select("span.a-price span.a-offscreen"):
+            if _is_sponsored_context(el):
+                continue
+            parsed_price, parsed_currency = _parse_price_text(el.get_text(" ", strip=True))
+            if parsed_price is None:
+                continue
+            price = parsed_price
+            currency = parsed_currency
             break
 
     if price is None:
