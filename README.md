@@ -8,7 +8,7 @@ Amazon UK product research MVP: browse category top sellers, maintain a personal
 - **Enrich** — Easyparser `DETAIL` for Watchlist ASIN paste (any signed-in user) and weekly category sync (admin)
 - **Seasonal Hunt** — Oxylabs Amazon SEARCH / bestsellers (1 Oxylabs result per run; no Easyparser fallback). Results auto-save to the `seasonal-hunt` category
 - **Weekly history** — `product_snapshots` for BSR, sales estimates, and week-vs-week fallback
-- **Daily prices** — Amazon mobile pages (`/gp/aw/d/{ASIN}`) via `make scrape-prices` / Vercel Cron (no Easyparser)
+- **Daily prices + Watchlist reviews** — Amazon mobile pages (`/gp/aw/d/{ASIN}`) via `make scrape-prices` / Vercel Cron (no Easyparser). Review-count deltas become Watchlist momentum.
 
 ```
 amazon-pulse/

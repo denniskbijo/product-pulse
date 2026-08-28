@@ -46,3 +46,24 @@ export function formatMonthlySold(value: number | null | undefined): string {
   }
   return `${value.toLocaleString("en-GB")}+`;
 }
+
+export function formatReviewsAdded(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return `+${value.toLocaleString("en-GB")}`;
+}
+
+/** Day-over-day rating-count velocity from mobile pages — not unit sales. */
+export function formatReviewMomentum(
+  value: string | null | undefined,
+): { text: string; className: string } {
+  if (value === "rising") {
+    return { text: "Rising", className: "momentum-rising" };
+  }
+  if (value === "steady") {
+    return { text: "Steady", className: "momentum-steady" };
+  }
+  if (value === "quiet") {
+    return { text: "Quiet", className: "momentum-quiet" };
+  }
+  return { text: "Building history", className: "flat" };
+}

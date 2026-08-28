@@ -8,15 +8,27 @@ from sqlalchemy.orm import Session, joinedload
 from app.asin import parse_asin_from_input
 from app.config import Settings
 from app.credits import credit_status, get_or_create_ledger, record_credit_usage
-from app.listing_price import resolve_uk_listing_price, upsert_daily_price_point
+from app.listing_price import (
+    resolve_uk_listing_price,
+    seed_mobile_listing_points,
+)
+from app.providers.prices.amazon_mobile import fetch_mobile_price
+from app.review_momentum import review_signal_for_asin
 from app.math_estimates import estimate_weekly_units, price_change, week_start_for
-from app.models import Category, DailyPricePoint, Product, ProductSnapshot
+from app.models import (
+    Category,
+    DailyPricePoint,
+    DailyReviewPoint,
+    Product,
+    ProductSnapshot,
+)
 from app.providers.enrichment.easyparser import CreditBudgetExceeded, EasyparserClient
 from app.schemas import (
     CategoryOut,
     CategoryTopOut,
     WatchlistProductAddOut,
     PriceHistoryPointOut,
+    ReviewHistoryPointOut,
     ProductCategorySightingOut,
     ProductDetailOut,
     ProductNotesOut,
@@ -139,6 +151,9 @@ def get_category_top(
             if prev is not None:
                 price_history_ready = True
 
+        latest_reviews, reviews_added, reviews_added_7d, momentum = (
+            review_signal_for_asin(db, asin=row.asin, on_or_before=today)
+        )
         products.append(
             TopProductOut(
                 rank=row.rank,
@@ -158,7 +173,10 @@ def get_category_top(
                 sales_estimate_source=row.sales_estimate_source,
                 bsr=row.bsr,
                 rating=row.rating,
-                review_count=row.review_count,
+                review_count=latest_reviews if latest_reviews is not None else row.review_count,
+                reviews_added=reviews_added,
+                reviews_added_7d=reviews_added_7d,
+                review_momentum=momentum,
                 monthly_sold=row.monthly_sold,
             )
         )
@@ -287,21 +305,24 @@ def add_product_to_watchlist(
         db.add(existing)
 
     existing.rank = rank
+    mobile = fetch_mobile_price(asin, host=settings.amazon_marketplace_host)
     price, currency = resolve_uk_listing_price(
         asin,
         fallback_price=enriched.price,
         fallback_currency=enriched.currency,
         settings=settings,
+        mobile=mobile,
     )
     existing.price = price
     existing.currency = currency
-    if price is not None:
-        upsert_daily_price_point(
-            db, asin=asin, price=price, currency=currency or "GBP"
-        )
+    seed_mobile_listing_points(db, asin=asin, mobile=mobile)
     existing.bsr = enriched.bsr
-    existing.rating = enriched.rating
-    existing.review_count = enriched.review_count
+    existing.rating = mobile.rating if mobile.rating is not None else enriched.rating
+    existing.review_count = (
+        mobile.review_count
+        if mobile.review_count is not None
+        else enriched.review_count
+    )
     existing.monthly_sold = enriched.monthly_sold
     existing.estimated_weekly_units = sales.weekly_units
     existing.sales_estimate_source = sales.source
@@ -421,6 +442,30 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         or "GBP"
     )
 
+    review_rows = db.scalars(
+        select(DailyReviewPoint)
+        .where(
+            DailyReviewPoint.asin == asin,
+            DailyReviewPoint.observed_on >= history_start,
+            DailyReviewPoint.status == "success",
+            DailyReviewPoint.review_count.is_not(None),
+        )
+        .order_by(DailyReviewPoint.observed_on.asc())
+    ).all()
+    review_history = [
+        ReviewHistoryPointOut(
+            date=row.observed_on,
+            review_count=int(row.review_count),  # type: ignore[arg-type]
+            reviews_added=row.reviews_added,
+            rating=row.rating,
+            source=row.source or "amazon_mobile",
+        )
+        for row in review_rows
+    ]
+    latest_reviews, reviews_added, reviews_added_7d, momentum = review_signal_for_asin(
+        db, asin=asin, on_or_before=today
+    )
+
     if now_daily and prev_daily and now_daily.observed_on != prev_daily.observed_on:
         delta = price_change(now_daily.price, prev_daily.price)
         history_ready = True
@@ -457,13 +502,25 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         estimated_weekly_units=latest_snap.estimated_weekly_units if latest_snap else None,
         sales_estimate_source=latest_snap.sales_estimate_source if latest_snap else None,
         bsr=latest_snap.bsr if latest_snap else None,
-        rating=latest_snap.rating if latest_snap else None,
-        review_count=latest_snap.review_count if latest_snap else None,
+        rating=(
+            review_rows[-1].rating
+            if review_rows and review_rows[-1].rating is not None
+            else (latest_snap.rating if latest_snap else None)
+        ),
+        review_count=(
+            latest_reviews
+            if latest_reviews is not None
+            else (latest_snap.review_count if latest_snap else None)
+        ),
+        reviews_added=reviews_added,
+        reviews_added_7d=reviews_added_7d,
+        review_momentum=momentum,
         monthly_sold=latest_snap.monthly_sold if latest_snap else None,
         latest_week_start=latest_snap.week_start if latest_snap else None,
         updated_at=product.updated_at,
         categories=categories,
         price_history=price_history,
+        review_history=review_history,
     )
 
 

@@ -13,6 +13,12 @@ MOBILE_UA = (
     "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 )
 PRICE_RE = re.compile(r"([0-9]+(?:\.[0-9]{1,2})?)")
+RATING_RE = re.compile(r"(\d(?:\.\d)?)\s+out of\s+5", re.I)
+REVIEW_COUNT_RE = re.compile(
+    r"([\d,]+)\s+(?:global\s+)?(?:ratings?|reviews?)",
+    re.I,
+)
+PAREN_COUNT_RE = re.compile(r"\(([\d,]+)\)")
 BLOCK_MARKERS = (
     "robot check",
     "validatecaptcha",
@@ -51,6 +57,8 @@ class MobilePriceResult:
     title: str | None = None
     error: str | None = None
     http_status: int | None = None
+    review_count: int | None = None
+    rating: float | None = None
 
 
 def mobile_product_url(asin: str, *, host: str = "www.amazon.co.uk") -> str:
@@ -91,6 +99,48 @@ def _is_sponsored_context(el: Tag) -> bool:
     return False
 
 
+def _parse_int_count(raw: str) -> int | None:
+    digits = raw.replace(",", "").strip()
+    if not digits.isdigit():
+        return None
+    return int(digits)
+
+
+def parse_mobile_reviews(soup: BeautifulSoup) -> tuple[int | None, float | None]:
+    """Read lifetime ratings/reviews from the product ACR block (not related items)."""
+    review_count: int | None = None
+    rating: float | None = None
+
+    acr = soup.select_one(
+        "#acrCustomerReviewLink, #acrCustomerReviewText, #averageCustomerReviews"
+    )
+    acr_text = acr.get_text(" ", strip=True) if acr else ""
+    if acr_text:
+        rating_match = RATING_RE.search(acr_text)
+        if rating_match:
+            rating = float(rating_match.group(1))
+        paren = PAREN_COUNT_RE.search(acr_text)
+        if paren:
+            review_count = _parse_int_count(paren.group(1))
+        if review_count is None:
+            count_match = REVIEW_COUNT_RE.search(acr_text)
+            if count_match:
+                review_count = _parse_int_count(count_match.group(1))
+
+    if review_count is None:
+        block = soup.select_one("#averageCustomerReviews_feature_div")
+        block_text = block.get_text(" ", strip=True) if block else ""
+        count_match = REVIEW_COUNT_RE.search(block_text)
+        if count_match:
+            review_count = _parse_int_count(count_match.group(1))
+        if rating is None:
+            rating_match = RATING_RE.search(block_text)
+            if rating_match:
+                rating = float(rating_match.group(1))
+
+    return review_count, rating
+
+
 def parse_mobile_product_html(html: str, *, asin: str) -> MobilePriceResult:
     if is_blocked_html(html):
         return MobilePriceResult(asin=asin, status="blocked", error="Amazon bot check page")
@@ -98,6 +148,7 @@ def parse_mobile_product_html(html: str, *, asin: str) -> MobilePriceResult:
     soup = BeautifulSoup(html, "lxml")
     title_el = soup.select_one("#productTitle, #title, span#title")
     title = title_el.get_text(strip=True) if title_el else None
+    review_count, rating = parse_mobile_reviews(soup)
 
     price: float | None = None
     currency: str | None = None
@@ -132,6 +183,8 @@ def parse_mobile_product_html(html: str, *, asin: str) -> MobilePriceResult:
             status="parse_error",
             title=title,
             error="No price found in mobile HTML",
+            review_count=review_count,
+            rating=rating,
         )
 
     return MobilePriceResult(
@@ -140,6 +193,8 @@ def parse_mobile_product_html(html: str, *, asin: str) -> MobilePriceResult:
         price=price,
         currency=currency or "GBP",
         title=title,
+        review_count=review_count,
+        rating=rating,
     )
 
 
@@ -185,4 +240,6 @@ def fetch_mobile_price(
         title=parsed.title,
         error=parsed.error,
         http_status=response.status_code,
+        review_count=parsed.review_count,
+        rating=parsed.rating,
     )

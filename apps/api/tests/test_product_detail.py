@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.models import Category, DailyPricePoint, Product, ProductSnapshot
+from app.models import Category, DailyPricePoint, DailyReviewPoint, Product, ProductSnapshot
 from app.services import get_product_detail
 
 
@@ -72,6 +72,28 @@ def test_get_product_detail_returns_enrichment_and_history():
     )
     db.commit()
 
+    db.add_all(
+        [
+            DailyReviewPoint(
+                asin=asin,
+                observed_on=today - timedelta(days=1),
+                review_count=100,
+                reviews_added=None,
+                rating=4.5,
+                status="success",
+            ),
+            DailyReviewPoint(
+                asin=asin,
+                observed_on=today,
+                review_count=104,
+                reviews_added=4,
+                rating=4.6,
+                status="success",
+            ),
+        ]
+    )
+    db.commit()
+
     detail = get_product_detail(db, asin)
     assert detail is not None
     assert detail.title == "Test Kettle"
@@ -81,6 +103,12 @@ def test_get_product_detail_returns_enrichment_and_history():
     assert detail.price_history_ready is True
     assert len(detail.price_history) >= 2
     assert detail.categories[0].slug == "watchlist"
+    assert detail.review_count == 104
+    assert detail.reviews_added == 4
+    assert detail.reviews_added_7d == 4
+    assert detail.review_momentum == "steady"
+    assert detail.rating == 4.6
+    assert len(detail.review_history) == 2
 
 
 def test_get_product_detail_missing():

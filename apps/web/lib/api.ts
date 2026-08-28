@@ -26,6 +26,9 @@ export type TopProduct = {
   bsr: number | null;
   rating: number | null;
   review_count: number | null;
+  reviews_added: number | null;
+  reviews_added_7d: number | null;
+  review_momentum: string | null;
   monthly_sold: number | null;
 };
 
@@ -167,6 +170,14 @@ export type PriceHistoryPoint = {
   source: string;
 };
 
+export type ReviewHistoryPoint = {
+  date: string;
+  review_count: number;
+  reviews_added: number | null;
+  rating: number | null;
+  source: string;
+};
+
 export type ProductDetail = {
   asin: string;
   title: string | null;
@@ -184,6 +195,9 @@ export type ProductDetail = {
   bsr: number | null;
   rating: number | null;
   review_count: number | null;
+  reviews_added: number | null;
+  reviews_added_7d: number | null;
+  review_momentum: string | null;
   monthly_sold: number | null;
   latest_week_start: string | null;
   updated_at: string | null;
@@ -194,6 +208,7 @@ export type ProductDetail = {
     week_start: string;
   }>;
   price_history: PriceHistoryPoint[];
+  review_history?: ReviewHistoryPoint[];
 };
 
 export function getProductDetail(asin: string) {

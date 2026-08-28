@@ -15,7 +15,13 @@ import {
 } from "@/lib/api";
 import { Toast, useToast } from "@/components/Toast";
 import { clearSession, isAdmin, loadSession, type Session } from "@/lib/auth";
-import { formatBsr, formatMonthlySold, formatPriceChange } from "@/lib/labels";
+import {
+  formatBsr,
+  formatMonthlySold,
+  formatPriceChange,
+  formatReviewMomentum,
+  formatReviewsAdded,
+} from "@/lib/labels";
 
 function formatPrice(price: number | null, currency: string | null) {
   if (price == null) return "—";
@@ -307,7 +313,7 @@ export default function HomePage() {
         </div>
         <p className="lede">
           {isWatchlist
-            ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it (uses Easyparser), or add candidates from Seasonal Hunt (free)."
+            ? "Your custom watchlist — paste an ASIN or Amazon UK product link to add it (uses Easyparser), or add candidates from Seasonal Hunt (free). Daily mobile checks track price and review-count momentum."
             : isSeasonalHunt
               ? "Candidates saved from Seasonal Hunt — current UK demand signals, not historical archives."
               : "UK category top sellers — current price, bought-past-month demand, and 7-day price changes."}
@@ -501,6 +507,30 @@ export default function HomePage() {
                         <dt>Best Sellers Rank</dt>
                         <dd>{formatBsr(product.bsr)}</dd>
                       </div>
+                      {isWatchlist ? (
+                        <>
+                          <div>
+                            <dt>Reviews</dt>
+                            <dd>
+                              {product.review_count != null
+                                ? product.review_count.toLocaleString("en-GB")
+                                : "—"}
+                              {product.reviews_added != null
+                                ? ` · ${formatReviewsAdded(product.reviews_added)} today`
+                                : ""}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Review momentum</dt>
+                            <dd className={formatReviewMomentum(product.review_momentum).className}>
+                              {formatReviewMomentum(product.review_momentum).text}
+                              {product.reviews_added_7d != null
+                                ? ` · ${formatReviewsAdded(product.reviews_added_7d)} / 7d`
+                                : ""}
+                            </dd>
+                          </div>
+                        </>
+                      ) : null}
                     </dl>
                     <ProductActions
                       product={product}
@@ -523,6 +553,12 @@ export default function HomePage() {
                     <th>7-day price change</th>
                     <th>Bought past month</th>
                     <th>Best Sellers Rank</th>
+                    {isWatchlist ? (
+                      <>
+                        <th>Reviews</th>
+                        <th>Momentum</th>
+                      </>
+                    ) : null}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -543,6 +579,24 @@ export default function HomePage() {
                         <td className={delta.className}>{delta.text}</td>
                         <td>{formatMonthlySold(product.monthly_sold)}</td>
                         <td>{formatBsr(product.bsr)}</td>
+                        {isWatchlist ? (
+                          <>
+                            <td>
+                              {product.review_count != null
+                                ? product.review_count.toLocaleString("en-GB")
+                                : "—"}
+                              {product.reviews_added != null
+                                ? ` · ${formatReviewsAdded(product.reviews_added)} today`
+                                : ""}
+                            </td>
+                            <td className={formatReviewMomentum(product.review_momentum).className}>
+                              {formatReviewMomentum(product.review_momentum).text}
+                              {product.reviews_added_7d != null
+                                ? ` · ${formatReviewsAdded(product.reviews_added_7d)} / 7d`
+                                : ""}
+                            </td>
+                          </>
+                        ) : null}
                         <td>
                           <ProductActions
                             product={product}
@@ -565,6 +619,9 @@ export default function HomePage() {
         “Bought past month” is Amazon’s public badge (a lower bound like 5K+),
         not an exact unit count. Prices update from daily checks; 7-day change
         uses recent daily history when we have it.
+        {isWatchlist
+          ? " Review momentum is the day-over-day change in Amazon rating counts from mobile pages — a demand signal, not unit sales."
+          : ""}
       </p>
 
       {notesEditor ? (

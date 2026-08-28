@@ -13,6 +13,8 @@ import {
   formatMonthlySold,
   formatPriceChange,
   formatPriceHistorySource,
+  formatReviewMomentum,
+  formatReviewsAdded,
 } from "@/lib/labels";
 
 function formatPrice(price: number | null, currency: string | null) {
@@ -66,6 +68,52 @@ function PriceSparkline({
       <div className="sparkline-scale">
         <span>{formatPrice(path.max, "GBP")}</span>
         <span>{formatPrice(path.min, "GBP")}</span>
+      </div>
+    </div>
+  );
+}
+
+function ReviewSparkline({
+  points,
+}: {
+  points: Array<{ date: string; review_count: number }>;
+}) {
+  const path = useMemo(() => {
+    if (points.length < 2) return null;
+    const counts = points.map((p) => p.review_count);
+    const min = Math.min(...counts);
+    const max = Math.max(...counts);
+    const span = max - min || 1;
+    const w = 320;
+    const h = 96;
+    const pad = 8;
+    const coords = points.map((point, index) => {
+      const x = pad + (index / (points.length - 1)) * (w - pad * 2);
+      const y = pad + (1 - (point.review_count - min) / span) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return { d: `M ${coords.join(" L ")}`, w, h, min, max };
+  }, [points]);
+
+  if (!path) {
+    return (
+      <p className="note">Need at least two daily review counts for a chart.</p>
+    );
+  }
+
+  return (
+    <div className="sparkline-wrap">
+      <svg
+        className="sparkline"
+        viewBox={`0 0 ${path.w} ${path.h}`}
+        role="img"
+        aria-label="Review count history chart"
+      >
+        <path d={path.d} fill="none" stroke="currentColor" strokeWidth="2.5" />
+      </svg>
+      <div className="sparkline-scale">
+        <span>{path.max.toLocaleString("en-GB")}</span>
+        <span>{path.min.toLocaleString("en-GB")}</span>
       </div>
     </div>
   );
@@ -258,6 +306,21 @@ export default function ProductDetailPage() {
                 </dd>
               </div>
               <div>
+                <dt>Reviews added</dt>
+                <dd>
+                  {formatReviewsAdded(detail.reviews_added)} today
+                  {detail.reviews_added_7d != null
+                    ? ` · ${formatReviewsAdded(detail.reviews_added_7d)} / 7d`
+                    : ""}
+                </dd>
+              </div>
+              <div>
+                <dt>Review momentum</dt>
+                <dd className={formatReviewMomentum(detail.review_momentum).className}>
+                  {formatReviewMomentum(detail.review_momentum).text}
+                </dd>
+              </div>
+              <div>
                 <dt>Latest week start</dt>
                 <dd>{detail.latest_week_start || "—"}</dd>
               </div>
@@ -306,6 +369,48 @@ export default function ProductDetailPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </section>
+
+          <section className="detail-panel">
+            <h2>Review momentum</h2>
+            <p className="note">
+              Daily rating counts from Amazon UK mobile pages. The day-over-day
+              change is a demand signal, not unit sales.
+            </p>
+            {(detail.review_history ?? []).length === 0 ? (
+              <p className="note">
+                No review history yet. Watchlist products pick this up on the
+                next daily mobile check.
+              </p>
+            ) : (
+              <>
+                <ReviewSparkline points={detail.review_history ?? []} />
+                <div className="table-wrap detail-history">
+                  <table className="product-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Reviews</th>
+                        <th>Added</th>
+                        <th>Rating</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...(detail.review_history ?? [])].reverse().map((point) => (
+                        <tr key={`${point.date}-${point.source}`}>
+                          <td>{point.date}</td>
+                          <td>{point.review_count.toLocaleString("en-GB")}</td>
+                          <td>{formatReviewsAdded(point.reviews_added)}</td>
+                          <td>
+                            {point.rating != null ? point.rating.toFixed(1) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </section>
         </>

@@ -47,6 +47,9 @@ class Product(Base):
 
     snapshots: Mapped[list["ProductSnapshot"]] = relationship(back_populates="product")
     daily_prices: Mapped[list["DailyPricePoint"]] = relationship(back_populates="product")
+    daily_reviews: Mapped[list["DailyReviewPoint"]] = relationship(
+        back_populates="product"
+    )
 
 
 class DailyPricePoint(Base):
@@ -70,6 +73,30 @@ class DailyPricePoint(Base):
     )
 
     product: Mapped[Product] = relationship(back_populates="daily_prices")
+
+
+class DailyReviewPoint(Base):
+    """One observed review count per ASIN per calendar day (Amazon mobile scrape)."""
+
+    __tablename__ = "daily_review_points"
+    __table_args__ = (
+        UniqueConstraint("asin", "observed_on", name="uq_daily_review_asin_day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asin: Mapped[str] = mapped_column(ForeignKey("products.asin"), index=True)
+    observed_on: Mapped[date] = mapped_column(Date, index=True)
+    review_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reviews_added: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source: Mapped[str] = mapped_column(String(32), default="amazon_mobile")
+    status: Mapped[str] = mapped_column(String(32), default="success")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    product: Mapped[Product] = relationship(back_populates="daily_reviews")
 
 
 class ProductSnapshot(Base):

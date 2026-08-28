@@ -71,3 +71,22 @@ def test_parse_mobile_prefers_buybox_over_sponsored_carousel():
     assert result.status == "success"
     assert result.price == 48.99
     assert result.currency == "GBP"
+
+
+SAMPLE_ACR_REVIEWS = """
+<html><body>
+  <span id="productTitle">Rinsemate</span>
+  <div id="tp_price_block_total_price_ww">
+    <span class="a-price"><span class="a-offscreen">£48.99</span></span>
+  </div>
+  <a id="acrCustomerReviewLink">4.1 out of 5 (6,103)</a>
+  <div id="averageCustomerReviews_feature_div">6,103 global ratings</div>
+</body></html>
+"""
+
+
+def test_parse_mobile_extracts_acr_review_count_and_rating():
+    result = parse_mobile_product_html(SAMPLE_ACR_REVIEWS, asin="B09RKS585V")
+    assert result.status == "success"
+    assert result.review_count == 6103
+    assert result.rating == 4.1

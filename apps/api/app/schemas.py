@@ -46,6 +46,9 @@ class TopProductOut(BaseModel):
     bsr: int | None = None
     rating: float | None = None
     review_count: int | None = None
+    reviews_added: int | None = None
+    reviews_added_7d: int | None = None
+    review_momentum: str | None = None
     monthly_sold: int | None = None
 
 
@@ -108,6 +111,14 @@ class PriceHistoryPointOut(BaseModel):
     source: str  # amazon_mobile | weekly_snapshot
 
 
+class ReviewHistoryPointOut(BaseModel):
+    date: date
+    review_count: int
+    reviews_added: int | None = None
+    rating: float | None = None
+    source: str = "amazon_mobile"
+
+
 class ProductCategorySightingOut(BaseModel):
     slug: str
     name: str
@@ -132,11 +143,15 @@ class ProductDetailOut(BaseModel):
     bsr: int | None = None
     rating: float | None = None
     review_count: int | None = None
+    reviews_added: int | None = None
+    reviews_added_7d: int | None = None
+    review_momentum: str | None = None
     monthly_sold: int | None = None
     latest_week_start: date | None = None
     updated_at: datetime | None = None
     categories: list[ProductCategorySightingOut] = Field(default_factory=list)
     price_history: list[PriceHistoryPointOut] = Field(default_factory=list)
+    review_history: list[ReviewHistoryPointOut] = Field(default_factory=list)
 
 
 class HuntProductTypeOut(BaseModel):

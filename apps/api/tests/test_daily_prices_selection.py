@@ -1,11 +1,13 @@
 from datetime import date
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.daily_prices import asins_from_latest_weekly_snapshots
+from app.config import Settings
+from app.daily_prices import asins_from_latest_weekly_snapshots, run_daily_price_scrape
 from app.db import Base
-from app.models import Category, Product, ProductSnapshot
+from app.models import Category, DailyReviewPoint, Product, ProductSnapshot
+from app.providers.prices.amazon_mobile import MobilePriceResult
 
 
 def _session():
@@ -114,3 +116,71 @@ def test_daily_scrape_covers_full_watchlist_even_if_over_max():
 
     asins = asins_from_latest_weekly_snapshots(db, max_n=2)
     assert asins == ["B0WATCH0001", "B0WATCH0002", "B0WATCH0003", "B0WATCH0004"]
+
+
+def test_daily_scrape_writes_review_points_for_watchlist_only(monkeypatch):
+    db = _session()
+    watch = Category(
+        slug="watchlist", name="Watchlist", bestsellers_url="https://www.amazon.co.uk/"
+    )
+    hunt = Category(
+        slug="seasonal-hunt",
+        name="Seasonal Hunt",
+        bestsellers_url="https://www.amazon.co.uk/",
+    )
+    db.add_all([watch, hunt])
+    db.flush()
+    week = date(2026, 8, 3)
+    observed = date(2026, 8, 18)
+    for asin in ("B0WATCH0001", "B0HUNT00001"):
+        db.add(Product(asin=asin))
+    db.flush()
+    db.add_all(
+        [
+            ProductSnapshot(
+                category_id=watch.id, asin="B0WATCH0001", week_start=week, rank=1
+            ),
+            ProductSnapshot(
+                category_id=hunt.id, asin="B0HUNT00001", week_start=week, rank=1
+            ),
+        ]
+    )
+    db.commit()
+
+    counts = {"B0WATCH0001": 6103, "B0HUNT00001": 50}
+
+    def fake_mobile(asin, *, host="www.amazon.co.uk", timeout=30.0):
+        return MobilePriceResult(
+            asin=asin,
+            status="success",
+            price=9.99,
+            currency="GBP",
+            review_count=counts[asin],
+            rating=4.1,
+        )
+
+    monkeypatch.setattr("app.daily_prices.fetch_mobile_price", fake_mobile)
+    summary = run_daily_price_scrape(
+        db,
+        settings=Settings(daily_scrape_delay_seconds=0, daily_scrape_max=10),
+        observed_on=observed,
+    )
+    assert summary.succeeded == 2
+
+    watch_row = db.scalar(
+        select(DailyReviewPoint).where(
+            DailyReviewPoint.asin == "B0WATCH0001",
+            DailyReviewPoint.observed_on == observed,
+        )
+    )
+    hunt_row = db.scalar(
+        select(DailyReviewPoint).where(
+            DailyReviewPoint.asin == "B0HUNT00001",
+            DailyReviewPoint.observed_on == observed,
+        )
+    )
+    assert watch_row is not None
+    assert watch_row.review_count == 6103
+    assert watch_row.rating == 4.1
+    assert watch_row.status == "success"
+    assert hunt_row is None

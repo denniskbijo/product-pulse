@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.models import Category, DailyPricePoint, Product, ProductSnapshot
 from app.providers.prices.amazon_mobile import fetch_mobile_price
+from app.review_momentum import upsert_daily_review_point
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,7 @@ def run_daily_price_scrape(
 
     succeeded = 0
     failed = 0
+    watchlist_asins = set(_asins_for_category_latest_week(db, category_slug="watchlist"))
 
     for index, asin in enumerate(targets):
         # Ensure FK target exists even if scrape fails.
@@ -146,6 +148,31 @@ def run_daily_price_scrape(
         existing.price = result.price
         existing.currency = result.currency
         existing.error_message = result.error
+
+        if asin in watchlist_asins:
+            if result.review_count is not None:
+                upsert_daily_review_point(
+                    db,
+                    asin=asin,
+                    review_count=result.review_count,
+                    rating=result.rating,
+                    observed_on=observed_on,
+                    status="success",
+                )
+            else:
+                upsert_daily_review_point(
+                    db,
+                    asin=asin,
+                    review_count=None,
+                    rating=None,
+                    observed_on=observed_on,
+                    status=(
+                        result.status
+                        if result.status != "success"
+                        else "parse_error"
+                    ),
+                    error_message=result.error or "No review count in mobile HTML",
+                )
 
         if result.status == "success" and result.price is not None:
             succeeded += 1

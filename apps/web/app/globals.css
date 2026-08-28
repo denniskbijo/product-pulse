@@ -571,6 +571,18 @@ tr:last-child td {
   color: var(--muted);
 }
 
+.momentum-rising {
+  color: var(--accent-2);
+}
+
+.momentum-steady {
+  color: var(--accent);
+}
+
+.momentum-quiet {
+  color: var(--muted);
+}
+
 .footer {
   margin-top: 1.5rem;
   color: var(--muted);

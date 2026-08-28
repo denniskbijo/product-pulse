@@ -18,7 +18,7 @@ help:
 	@echo "  make api            Start API only"
 	@echo "  make web            Start Next.js only"
 	@echo "  make test           Run API unit tests"
-	@echo "  make scrape-prices  Daily Amazon mobile price scrape (max 10 weekly ASINs)"
+	@echo "  make scrape-prices  Daily Amazon mobile price + Watchlist review scrape"
 	@echo "  make db-pull        Copy production Neon DB into local DATABASE_URL"
 	@echo ""
 	@echo "Requires .env with EASYPARSER_API_KEY (see .env.example)."
@@ -64,7 +64,7 @@ web: install
 test: install
 	cd $(API_DIR) && $(VENV)/bin/pytest -q
 
-# Local/cron: scrape up to DAILY_SCRAPE_MAX prices via Amazon mobile pages (no Easyparser).
+# Local/cron: scrape prices + Watchlist review counts via Amazon mobile pages (no Easyparser).
 scrape-prices: install
 	@set -a; source $(ROOT)/.env 2>/dev/null || true; set +a; \
 	cd $(API_DIR) && $(PYTHON) -m app scrape-prices
