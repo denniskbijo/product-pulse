@@ -8,7 +8,7 @@ UVICORN := $(VENV)/bin/uvicorn
 API_PORT ?= 8000
 WEB_PORT ?= 3000
 
-.PHONY: help install run dev api web test scrape-prices db-pull stop
+.PHONY: help install run dev api web test test-ui test-ui-install scrape-prices db-pull stop
 
 help:
 	@echo "Amazon Pulse / product-pulse"
@@ -18,6 +18,8 @@ help:
 	@echo "  make api            Start API only"
 	@echo "  make web            Start Next.js only"
 	@echo "  make test           Run API unit tests"
+	@echo "  make test-ui        Run mocked Playwright UI tests"
+	@echo "  make test-ui-install  Install Playwright Chromium (once)"
 	@echo "  make scrape-prices  Daily Amazon mobile price + Watchlist review scrape"
 	@echo "  make db-pull        Copy production Neon DB into local DATABASE_URL"
 	@echo ""
@@ -63,6 +65,12 @@ web: install
 
 test: install
 	cd $(API_DIR) && $(VENV)/bin/pytest -q
+
+test-ui-install:
+	cd $(WEB_DIR) && npm install && npx playwright install chromium
+
+test-ui: $(WEB_DIR)/node_modules
+	cd $(WEB_DIR) && npx playwright test
 
 # Local/cron: scrape prices + Watchlist review counts via Amazon mobile pages (no Easyparser).
 scrape-prices: install

@@ -207,12 +207,28 @@ export type ProductDetail = {
     rank: number;
     week_start: string;
   }>;
+  history_days?: number;
+  history_start?: string | null;
+  history_end?: string | null;
+  history_has_older?: boolean;
+  history_has_newer?: boolean;
   price_history: PriceHistoryPoint[];
   review_history?: ReviewHistoryPoint[];
 };
 
-export function getProductDetail(asin: string) {
-  return apiFetch<ProductDetail>(`/products/${encodeURIComponent(asin)}`);
+export const HISTORY_WINDOW_DAYS = 7;
+export const HISTORY_TABLE_PAGE_SIZE = 5;
+
+export function getProductDetail(
+  asin: string,
+  opts?: { historyDays?: number; historyEnd?: string },
+) {
+  const params = new URLSearchParams();
+  params.set("history_days", String(opts?.historyDays ?? HISTORY_WINDOW_DAYS));
+  if (opts?.historyEnd) params.set("history_end", opts.historyEnd);
+  return apiFetch<ProductDetail>(
+    `/products/${encodeURIComponent(asin)}?${params.toString()}`,
+  );
 }
 
 export type ProductNotesResult = {

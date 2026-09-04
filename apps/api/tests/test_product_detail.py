@@ -56,6 +56,13 @@ def test_get_product_detail_returns_enrichment_and_history():
         [
             DailyPricePoint(
                 asin=asin,
+                observed_on=today - timedelta(days=20),
+                price=18.0,
+                currency="GBP",
+                status="success",
+            ),
+            DailyPricePoint(
+                asin=asin,
                 observed_on=today - timedelta(days=7),
                 price=22.0,
                 currency="GBP",
@@ -70,15 +77,21 @@ def test_get_product_detail_returns_enrichment_and_history():
             ),
         ]
     )
-    db.commit()
-
     db.add_all(
         [
             DailyReviewPoint(
                 asin=asin,
+                observed_on=today - timedelta(days=20),
+                review_count=80,
+                reviews_added=None,
+                rating=4.4,
+                status="success",
+            ),
+            DailyReviewPoint(
+                asin=asin,
                 observed_on=today - timedelta(days=1),
                 review_count=100,
-                reviews_added=None,
+                reviews_added=20,
                 rating=4.5,
                 status="success",
             ),
@@ -101,14 +114,39 @@ def test_get_product_detail_returns_enrichment_and_history():
     assert detail.price == 24.0
     assert detail.price_change_absolute == 2.0
     assert detail.price_history_ready is True
-    assert len(detail.price_history) >= 2
+    assert detail.history_days == 7
+    assert detail.history_end == today
+    assert detail.history_start == today - timedelta(days=6)
+    assert detail.history_has_older is True
+    assert detail.history_has_newer is False
+    price_dates = {p.date for p in detail.price_history}
+    assert today in price_dates
+    assert today - timedelta(days=20) not in price_dates
+    assert today - timedelta(days=7) not in price_dates
     assert detail.categories[0].slug == "watchlist"
     assert detail.review_count == 104
     assert detail.reviews_added == 4
-    assert detail.reviews_added_7d == 4
+    assert detail.reviews_added_7d == 24
     assert detail.review_momentum == "steady"
     assert detail.rating == 4.6
-    assert len(detail.review_history) == 2
+    assert [r.date for r in detail.review_history] == [
+        today - timedelta(days=1),
+        today,
+    ]
+
+    older = get_product_detail(
+        db, asin, history_days=7, history_end=today - timedelta(days=14)
+    )
+    assert older is not None
+    assert older.history_end == today - timedelta(days=14)
+    assert today - timedelta(days=20) in {p.date for p in older.price_history}
+    assert today not in {p.date for p in older.price_history}
+    assert older.history_has_newer is True
+    assert older.rating == 4.6
+    empty_recent_end = today
+    recent = get_product_detail(db, asin, history_days=7, history_end=empty_recent_end)
+    assert recent is not None
+    assert recent.history_has_newer is False
 
 
 def test_get_product_detail_missing():

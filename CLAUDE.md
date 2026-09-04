@@ -74,4 +74,8 @@ _Add a brief overview of your project architecture_
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+### History windows (charts and tables)
+
+Default every product time-series (price, reviews, future daily metrics) to the **last 7 days**. Paginate older windows through the API instead of returning the full series on first load. Tables paginate rows inside the current window.
+
+Skill: `.agents/skills/history-windows/SKILL.md` (also `.cursor/skills/history-windows/SKILL.md`).

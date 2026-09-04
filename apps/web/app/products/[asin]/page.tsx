@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  HISTORY_TABLE_PAGE_SIZE,
+  HISTORY_WINDOW_DAYS,
   getProductDetail,
   updateProductNotes,
   type ProductDetail,
@@ -16,6 +18,124 @@ import {
   formatReviewMomentum,
   formatReviewsAdded,
 } from "@/lib/labels";
+
+function todayIso(): string {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const next = new Date(year, month - 1, day + days);
+  return [
+    next.getFullYear(),
+    String(next.getMonth() + 1).padStart(2, "0"),
+    String(next.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function formatIsoRange(start?: string | null, end?: string | null): string {
+  if (!start || !end) return "Last 7 days";
+  const fmt = (iso: string) => {
+    const [year, month, day] = iso.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+  };
+  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+}
+
+function pageSlice<T>(rows: T[], page: number, pageSize: number) {
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safe = Math.min(Math.max(0, page), pages - 1);
+  return {
+    page: safe,
+    pages,
+    rows: rows.slice(safe * pageSize, (safe + 1) * pageSize),
+  };
+}
+
+function HistoryRangePager({
+  start,
+  end,
+  hasOlder,
+  hasNewer,
+  busy,
+  onOlder,
+  onNewer,
+}: {
+  start?: string | null;
+  end?: string | null;
+  hasOlder?: boolean;
+  hasNewer?: boolean;
+  busy: boolean;
+  onOlder: () => void;
+  onNewer: () => void;
+}) {
+  return (
+    <div className="history-pager" data-testid="history-pager">
+      <button
+        type="button"
+        className="button secondary compact"
+        disabled={!hasOlder || busy}
+        onClick={onOlder}
+      >
+        Older
+      </button>
+      <span className="note">{formatIsoRange(start, end)}</span>
+      <button
+        type="button"
+        className="button secondary compact"
+        disabled={!hasNewer || busy}
+        onClick={onNewer}
+      >
+        Newer
+      </button>
+    </div>
+  );
+}
+
+function TablePager({
+  page,
+  pages,
+  busy,
+  onChange,
+}: {
+  page: number;
+  pages: number;
+  busy?: boolean;
+  onChange: (page: number) => void;
+}) {
+  if (pages <= 1) return null;
+  return (
+    <div className="table-pager">
+      <button
+        type="button"
+        className="button secondary compact"
+        disabled={page <= 0 || busy}
+        onClick={() => onChange(page - 1)}
+      >
+        Previous
+      </button>
+      <span className="note">
+        Page {page + 1} of {pages}
+      </span>
+      <button
+        type="button"
+        className="button secondary compact"
+        disabled={page >= pages - 1 || busy}
+        onClick={() => onChange(page + 1)}
+      >
+        Next
+      </button>
+    </div>
+  );
+}
 
 function formatPrice(price: number | null, currency: string | null) {
   if (price == null) return "—";
@@ -130,6 +250,9 @@ export default function ProductDetailPage() {
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesMessage, setNotesMessage] = useState<string | null>(null);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [pricePage, setPricePage] = useState(0);
+  const [reviewPage, setReviewPage] = useState(0);
 
   useEffect(() => {
     const session = loadSession();
@@ -145,11 +268,13 @@ export default function ProductDetailPage() {
 
     let cancelled = false;
     setLoading(true);
-    getProductDetail(asin)
+    getProductDetail(asin, { historyDays: HISTORY_WINDOW_DAYS })
       .then((data) => {
         if (!cancelled) {
           setDetail(data);
           setNotesDraft(data.notes || "");
+          setPricePage(0);
+          setReviewPage(0);
           setError(null);
         }
       })
@@ -167,6 +292,31 @@ export default function ProductDetailPage() {
       cancelled = true;
     };
   }, [asin, router]);
+
+  const shiftHistory = async (direction: "older" | "newer") => {
+    if (!detail?.history_start || !detail.history_end) return;
+    const nextEnd =
+      direction === "older"
+        ? addDaysIso(detail.history_start, -1)
+        : addDaysIso(detail.history_end, HISTORY_WINDOW_DAYS) < todayIso()
+          ? addDaysIso(detail.history_end, HISTORY_WINDOW_DAYS)
+          : todayIso();
+    setHistoryBusy(true);
+    setError(null);
+    try {
+      const data = await getProductDetail(asin, {
+        historyDays: HISTORY_WINDOW_DAYS,
+        historyEnd: nextEnd,
+      });
+      setDetail({ ...data, notes: detail.notes });
+      setPricePage(0);
+      setReviewPage(0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load history");
+    } finally {
+      setHistoryBusy(false);
+    }
+  };
 
   const delta = formatPriceChange(
     detail?.price_change_absolute ?? null,
@@ -337,51 +487,94 @@ export default function ProductDetailPage() {
             </dl>
           </section>
 
-          <section className="detail-panel">
+          <section className="detail-panel" data-testid="price-history">
             <h2>Price history</h2>
             <p className="note">
-              Recent daily price checks, with weekly updates filling any gaps.
+              Last 7 days on load. Use Older / Newer to page more history
+              without loading the full series.
             </p>
+            <HistoryRangePager
+              start={detail.history_start}
+              end={detail.history_end}
+              hasOlder={detail.history_has_older}
+              hasNewer={detail.history_has_newer}
+              busy={historyBusy}
+              onOlder={() => void shiftHistory("older")}
+              onNewer={() => void shiftHistory("newer")}
+            />
             <PriceSparkline points={detail.price_history} />
             {detail.price_history.length === 0 ? (
               <p className="note">
-                No price history yet. It appears after products are updated and
-                daily checks run.
+                No price points in this date range. It appears after products
+                are updated and daily checks run.
               </p>
             ) : (
-              <div className="table-wrap detail-history">
-                <table className="product-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Price</th>
-                      <th>Source</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...detail.price_history].reverse().map((point) => (
-                      <tr key={`${point.date}-${point.source}`}>
-                        <td>{point.date}</td>
-                        <td>{formatPrice(point.price, point.currency)}</td>
-                        <td>{formatPriceHistorySource(point.source)}</td>
+              <>
+                <div className="table-wrap detail-history">
+                  <table className="product-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Source</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pageSlice(
+                        [...detail.price_history].reverse(),
+                        pricePage,
+                        HISTORY_TABLE_PAGE_SIZE,
+                      ).rows.map((point) => (
+                        <tr key={`${point.date}-${point.source}`}>
+                          <td>{point.date}</td>
+                          <td>{formatPrice(point.price, point.currency)}</td>
+                          <td>{formatPriceHistorySource(point.source)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <TablePager
+                  page={
+                    pageSlice(
+                      detail.price_history,
+                      pricePage,
+                      HISTORY_TABLE_PAGE_SIZE,
+                    ).page
+                  }
+                  pages={
+                    pageSlice(
+                      detail.price_history,
+                      pricePage,
+                      HISTORY_TABLE_PAGE_SIZE,
+                    ).pages
+                  }
+                  busy={historyBusy}
+                  onChange={setPricePage}
+                />
+              </>
             )}
           </section>
 
-          <section className="detail-panel">
+          <section className="detail-panel" data-testid="review-history">
             <h2>Review momentum</h2>
             <p className="note">
               Daily rating counts from Amazon UK mobile pages. The day-over-day
               change is a demand signal, not unit sales.
             </p>
+            <HistoryRangePager
+              start={detail.history_start}
+              end={detail.history_end}
+              hasOlder={detail.history_has_older}
+              hasNewer={detail.history_has_newer}
+              busy={historyBusy}
+              onOlder={() => void shiftHistory("older")}
+              onNewer={() => void shiftHistory("newer")}
+            />
             {(detail.review_history ?? []).length === 0 ? (
               <p className="note">
-                No review history yet. Watchlist products pick this up on the
-                next daily mobile check.
+                No review history in this date range. Watchlist products pick
+                this up on the next daily mobile check.
               </p>
             ) : (
               <>
@@ -397,7 +590,11 @@ export default function ProductDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[...(detail.review_history ?? [])].reverse().map((point) => (
+                      {pageSlice(
+                        [...(detail.review_history ?? [])].reverse(),
+                        reviewPage,
+                        HISTORY_TABLE_PAGE_SIZE,
+                      ).rows.map((point) => (
                         <tr key={`${point.date}-${point.source}`}>
                           <td>{point.date}</td>
                           <td>{point.review_count.toLocaleString("en-GB")}</td>
@@ -410,6 +607,24 @@ export default function ProductDetailPage() {
                     </tbody>
                   </table>
                 </div>
+                <TablePager
+                  page={
+                    pageSlice(
+                      detail.review_history ?? [],
+                      reviewPage,
+                      HISTORY_TABLE_PAGE_SIZE,
+                    ).page
+                  }
+                  pages={
+                    pageSlice(
+                      detail.review_history ?? [],
+                      reviewPage,
+                      HISTORY_TABLE_PAGE_SIZE,
+                    ).pages
+                  }
+                  busy={historyBusy}
+                  onChange={setReviewPage}
+                />
               </>
             )}
           </section>

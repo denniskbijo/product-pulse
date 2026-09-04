@@ -126,3 +126,16 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Conventions & Patterns
+
+### History windows (charts and tables)
+
+Default every product time-series (price, reviews, future daily metrics) to the **last 7 days**. Paginate older windows through the API instead of returning the full series on first load. Tables paginate rows inside the current window.
+
+Skill: [history-windows](.agents/skills/history-windows/SKILL.md) (also `.cursor/skills/history-windows/SKILL.md`).
+
+### Project ledger
+
+[LEDGER.md](LEDGER.md) is the initiative index. Beads remain the source of truth for status. When adding a feature or roadmap item, add a row there and a `bd create` issue.
+

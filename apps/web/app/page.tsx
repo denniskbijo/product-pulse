@@ -477,7 +477,7 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            <ul className="product-cards">
+            <ul className="product-cards" data-testid="product-cards">
               {data.products.map((product) => {
                 const delta = formatPriceChange(
                   product.price_change_absolute,
@@ -543,8 +543,8 @@ export default function HomePage() {
               })}
             </ul>
 
-            <div className="table-wrap">
-              <table className="product-table">
+            <div className="table-wrap list-table" data-testid="product-list-table">
+              <table className={`product-table${isWatchlist ? " product-table-watchlist" : ""}`}>
                 <thead>
                   <tr>
                     <th>Rank</th>

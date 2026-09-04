@@ -150,6 +150,11 @@ class ProductDetailOut(BaseModel):
     latest_week_start: date | None = None
     updated_at: datetime | None = None
     categories: list[ProductCategorySightingOut] = Field(default_factory=list)
+    history_days: int = 7
+    history_start: date | None = None
+    history_end: date | None = None
+    history_has_older: bool = False
+    history_has_newer: bool = False
     price_history: list[PriceHistoryPointOut] = Field(default_factory=list)
     review_history: list[ReviewHistoryPointOut] = Field(default_factory=list)
 

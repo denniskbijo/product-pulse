@@ -37,6 +37,25 @@ from app.schemas import (
 )
 from app.sync import build_sync_status
 
+HISTORY_WINDOW_DAYS_DEFAULT = 7
+HISTORY_WINDOW_DAYS_MAX = 31
+
+
+def clamp_history_days(days: int) -> int:
+    return max(1, min(HISTORY_WINDOW_DAYS_MAX, days))
+
+
+def history_window_bounds(
+    *, history_days: int = HISTORY_WINDOW_DAYS_DEFAULT, history_end: date | None = None
+) -> tuple[date, date, int]:
+    days = clamp_history_days(history_days)
+    today = date.today()
+    end = history_end or today
+    if end > today:
+        end = today
+    start = end - timedelta(days=days - 1)
+    return start, end, days
+
 
 def _latest_week_start(db: Session, category_id: int) -> date | None:
     return db.scalar(
@@ -343,7 +362,13 @@ def add_product_to_watchlist(
     )
 
 
-def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
+def get_product_detail(
+    db: Session,
+    asin: str,
+    *,
+    history_days: int = HISTORY_WINDOW_DAYS_DEFAULT,
+    history_end: date | None = None,
+) -> ProductDetailOut | None:
     """Return stored Easyparser enrichment + recent price history (no provider calls)."""
     asin = asin.strip().upper()
     product = db.get(Product, asin)
@@ -383,12 +408,15 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         )
 
     today = date.today()
-    history_start = today - timedelta(days=30)
+    history_start, window_end, window_days = history_window_bounds(
+        history_days=history_days, history_end=history_end
+    )
     daily_rows = db.scalars(
         select(DailyPricePoint)
         .where(
             DailyPricePoint.asin == asin,
             DailyPricePoint.observed_on >= history_start,
+            DailyPricePoint.observed_on <= window_end,
             DailyPricePoint.status == "success",
             DailyPricePoint.price.is_not(None),
         )
@@ -411,6 +439,7 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         .where(
             ProductSnapshot.asin == asin,
             ProductSnapshot.week_start >= history_start,
+            ProductSnapshot.week_start <= window_end,
             ProductSnapshot.price.is_not(None),
         )
         .order_by(ProductSnapshot.week_start.asc())
@@ -447,6 +476,7 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         .where(
             DailyReviewPoint.asin == asin,
             DailyReviewPoint.observed_on >= history_start,
+            DailyReviewPoint.observed_on <= window_end,
             DailyReviewPoint.status == "success",
             DailyReviewPoint.review_count.is_not(None),
         )
@@ -464,6 +494,32 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
     ]
     latest_reviews, reviews_added, reviews_added_7d, momentum = review_signal_for_asin(
         db, asin=asin, on_or_before=today
+    )
+    latest_review_row = db.scalar(
+        select(DailyReviewPoint)
+        .where(
+            DailyReviewPoint.asin == asin,
+            DailyReviewPoint.status == "success",
+            DailyReviewPoint.review_count.is_not(None),
+        )
+        .order_by(DailyReviewPoint.observed_on.desc())
+        .limit(1)
+    )
+    older_price = db.scalar(
+        select(DailyPricePoint.id).where(
+            DailyPricePoint.asin == asin,
+            DailyPricePoint.observed_on < history_start,
+            DailyPricePoint.status == "success",
+            DailyPricePoint.price.is_not(None),
+        ).limit(1)
+    )
+    older_review = db.scalar(
+        select(DailyReviewPoint.id).where(
+            DailyReviewPoint.asin == asin,
+            DailyReviewPoint.observed_on < history_start,
+            DailyReviewPoint.status == "success",
+            DailyReviewPoint.review_count.is_not(None),
+        ).limit(1)
     )
 
     if now_daily and prev_daily and now_daily.observed_on != prev_daily.observed_on:
@@ -503,8 +559,8 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         sales_estimate_source=latest_snap.sales_estimate_source if latest_snap else None,
         bsr=latest_snap.bsr if latest_snap else None,
         rating=(
-            review_rows[-1].rating
-            if review_rows and review_rows[-1].rating is not None
+            latest_review_row.rating
+            if latest_review_row is not None and latest_review_row.rating is not None
             else (latest_snap.rating if latest_snap else None)
         ),
         review_count=(
@@ -519,6 +575,11 @@ def get_product_detail(db: Session, asin: str) -> ProductDetailOut | None:
         latest_week_start=latest_snap.week_start if latest_snap else None,
         updated_at=product.updated_at,
         categories=categories,
+        history_days=window_days,
+        history_start=history_start,
+        history_end=window_end,
+        history_has_older=older_price is not None or older_review is not None,
+        history_has_newer=window_end < today,
         price_history=price_history,
         review_history=review_history,
     )

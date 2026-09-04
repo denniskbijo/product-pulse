@@ -27,6 +27,12 @@ node_modules/
 apps/*/.vercel/
 apps/*/.env.local
 
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/
+apps/web/playwright/.cache/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 .beads-credential-key
